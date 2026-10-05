@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const mongoose=require("mongoose");
 
+require("dotenv").config();
+
 const app = express();
 
 app.use(cors());
@@ -12,9 +14,9 @@ const Expense = require("./models/Expense");
 const Customer = require("./models/Customer")
 const Invoice = require("./models/Invoice");
 
-mongoose.connect("mongodb+srv://nihala234:nihala2005@cluster0.fsuha7k.mongodb.net/accounting_system")
-.then(()=>console.log("mongodb connected")).catch((err)=>console.log(err))
-
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("mongodb connected"))
+  .catch((err) => console.log(err));
 app.get("/", (req, res) => {
     res.send("Accounting System Backend is running");
 });
@@ -478,6 +480,8 @@ app.delete("/invoices/:id", async (req, res) => {
     });
   }
 });
-app.listen(5000, () => {
-    console.log("Server running on port 5000");
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
