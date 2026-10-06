@@ -22,7 +22,7 @@ const [toDate, setToDate] = useState("")
   const fetchExpenses = async () => {
     try {
       const response = await axios.get(
-        "http://localhost:5000/expenses"
+  `${import.meta.env.VITE_API_URL}/expenses`
       );
 
       setExpenses(response.data);
@@ -49,7 +49,7 @@ const [toDate, setToDate] = useState("")
     try {
 
       await axios.delete(
-        `http://localhost:5000/expenses/${id}`
+  `${import.meta.env.VITE_API_URL}/expenses/${id}`
       );
 
       fetchExpenses();

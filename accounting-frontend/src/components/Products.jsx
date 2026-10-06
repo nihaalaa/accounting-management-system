@@ -94,7 +94,7 @@ export const Products = () => {
   const fetchProducts = async () => {
     try {
       const response = await axios.get(
-        "http://localhost:5000/products"
+  `${import.meta.env.VITE_API_URL}/products`
       );
 
       setProducts(response.data || []);
@@ -236,7 +236,7 @@ export const Products = () => {
 
     try {
       await axios.delete(
-        `http://localhost:5000/products/${id}`
+  `${import.meta.env.VITE_API_URL}/products/${id}`
       );
 
       const updatedProducts = products.filter(

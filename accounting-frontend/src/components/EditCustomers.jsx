@@ -30,7 +30,7 @@ export const EditCustomers = () => {
     const fetchCustomer = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:5000/customers/${id}`
+  `${import.meta.env.VITE_API_URL}/customers/${id}`
         );
 
         setCustomer(response.data);
@@ -59,8 +59,8 @@ export const EditCustomers = () => {
 
     try {
       await axios.put(
-        `http://localhost:5000/customers/${id}`,
-        customer
+  `${import.meta.env.VITE_API_URL}/customers/${id}`,
+  customer
       );
 
       alert("Customer updated successfully");

@@ -20,7 +20,7 @@ export const EditExpense = () => {
     const fetchExpense = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:5000/expenses/${id}`
+  `${import.meta.env.VITE_API_URL}/expenses/${id}`
         );
 
         const data = response.data;
@@ -55,8 +55,8 @@ export const EditExpense = () => {
 
     try {
       await axios.put(
-        `http://localhost:5000/expenses/${id}`,
-        expense
+  `${import.meta.env.VITE_API_URL}/expenses/${id}`,
+  expense
       );
 
       alert("Expense updated successfully");

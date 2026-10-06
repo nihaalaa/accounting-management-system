@@ -26,7 +26,10 @@ export const AddExpense = () => {
     e.preventDefault();
 
     try {
-      await axios.post("http://localhost:5000/expenses", expense);
+      await axios.post(
+          `${import.meta.env.VITE_API_URL}/expenses`,
+  expense
+      );
 
       alert("Expense added successfully");
 

@@ -37,7 +37,7 @@ export const Customers = () => {
   const fetchCustomers = async () => {
     try {
       const response = await axios.get(
-        "http://localhost:5000/customers"
+  `${import.meta.env.VITE_API_URL}/customers`
       );
 
       setCustomers(response.data);
@@ -65,7 +65,7 @@ export const Customers = () => {
 
     try {
       await axios.delete(
-        `http://localhost:5000/customers/${id}`
+  `${import.meta.env.VITE_API_URL}/customers/${id}`
       );
 
       fetchCustomers();

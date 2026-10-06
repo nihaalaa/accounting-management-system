@@ -109,7 +109,7 @@ export const EditProduct = () => {
         setError("");
 
         const response = await axios.get(
-          `http://localhost:5000/products/${id}`
+          `${import.meta.env.VITE_API_URL}/products/${id}`
         );
 
         const data = response.data;
@@ -165,7 +165,7 @@ export const EditProduct = () => {
     const fetchCategories = async () => {
       try {
         const response = await axios.get(
-          "http://localhost:5000/categories"
+           `${import.meta.env.VITE_API_URL}/categories`
         );
 
         setCategories(response.data || []);
@@ -266,9 +266,9 @@ export const EditProduct = () => {
       setSaving(true);
 
       await axios.put(
-        `http://localhost:5000/products/${id}`,
-        product
-      );
+  `${import.meta.env.VITE_API_URL}/products/${id}`,
+  product
+    );
 
       alert("Product updated successfully.");
 

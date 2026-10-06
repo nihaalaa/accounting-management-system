@@ -32,7 +32,7 @@ export const Categories = () => {
   const fetchCategories = async () => {
     try {
       const response = await axios.get(
-        "http://localhost:5000/categories"
+  `${import.meta.env.VITE_API_URL}/categories`
       );
 
       setCategories(response.data);
@@ -54,7 +54,7 @@ export const Categories = () => {
 
     try {
       const response = await axios.delete(
-        `http://localhost:5000/categories/${id}`
+  `${import.meta.env.VITE_API_URL}/categories/${id}`
       );
 
       alert(response.data);

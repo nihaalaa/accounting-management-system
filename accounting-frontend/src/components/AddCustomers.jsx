@@ -33,8 +33,8 @@ export const AddCustomers = () => {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/customers",
-        customer
+  `${import.meta.env.VITE_API_URL}/customers`,
+  customer
       );
 
       alert(response.data.message || "Customer added successfully");

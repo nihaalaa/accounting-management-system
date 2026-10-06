@@ -98,7 +98,7 @@ export const AddProduct = () => {
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/categories")
+      .get(`${import.meta.env.VITE_API_URL}/categories`)
       .then((res) => {
         setCategories(res.data || []);
       })
@@ -235,7 +235,7 @@ export const AddProduct = () => {
     setSaving(true);
 
     try {
-      await axios.post("http://localhost:5000/products", product);
+      await axios.post(  `${import.meta.env.VITE_API_URL}/products`,product);
 
       alert("Product added successfully.");
 

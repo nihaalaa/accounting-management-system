@@ -51,9 +51,9 @@ export const EditInvoice = () => {
           productsResponse,
           invoiceResponse,
         ] = await Promise.all([
-          axios.get("http://localhost:5000/customers"),
-          axios.get("http://localhost:5000/products"),
-          axios.get(`http://localhost:5000/invoices/${id}`),
+          axios.get(`${import.meta.env.VITE_API_URL}/customers`),
+          axios.get(`${import.meta.env.VITE_API_URL}/products`),
+          axios.get(`${import.meta.env.VITE_API_URL}/invoices/${id}`),
         ]);
 
         setCustomers(customersResponse.data);
@@ -338,7 +338,7 @@ export const EditInvoice = () => {
       };
 
       await axios.put(
-        `http://localhost:5000/invoices/${id}`,
+        `${import.meta.env.VITE_API_URL}/invoices/${id}`,
         invoiceData
       );
 

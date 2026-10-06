@@ -31,7 +31,7 @@ export const Invoices = () => {
   const fetchInvoices = async () => {
     try {
       const response = await axios.get(
-        "http://localhost:5000/invoices"
+        `${import.meta.env.VITE_API_URL}/invoices`
       );
 
       setInvoices(response.data);
@@ -57,7 +57,7 @@ export const Invoices = () => {
 
     try {
       const response = await axios.delete(
-        `http://localhost:5000/invoices/${id}`
+        `${import.meta.env.VITE_API_URL}/invoices/${id}`
       );
 
       alert(

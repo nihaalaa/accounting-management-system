@@ -28,7 +28,7 @@ export const EditCategory = () => {
     const getCategory = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:5000/categories/${id}`
+  `${import.meta.env.VITE_API_URL}/categories/${id}`
         );
 
         setName(response.data.name);
@@ -84,7 +84,7 @@ export const EditCategory = () => {
 
     try {
       const response = await axios.put(
-        `http://localhost:5000/categories/${id}`,
+  `${import.meta.env.VITE_API_URL}/categories/${id}`,
         {
           name: name,
           image: image,

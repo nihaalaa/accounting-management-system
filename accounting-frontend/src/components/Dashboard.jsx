@@ -35,8 +35,8 @@ export const Dashboard = () => {
       setError("");
 
       const [invoiceResponse, expenseResponse] = await Promise.all([
-        axios.get("http://localhost:5000/invoices"),
-        axios.get("http://localhost:5000/expenses"),
+        axios.get(`${import.meta.env.VITE_API_URL}/invoices`),
+        axios.get(`${import.meta.env.VITE_API_URL}/expenses`),
       ]);
 
       setInvoices(

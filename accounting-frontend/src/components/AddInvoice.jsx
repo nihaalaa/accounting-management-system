@@ -49,7 +49,7 @@ export const AddInvoice = () => {
   const fetchCustomers = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:5000/customers"
+        `${import.meta.env.VITE_API_URL}/customers`
       );
 
       setCustomers(res.data);
@@ -61,7 +61,7 @@ export const AddInvoice = () => {
   const fetchProducts = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:5000/products"
+        `${import.meta.env.VITE_API_URL}/products`
       );
 
       setProducts(res.data);
@@ -77,7 +77,7 @@ export const AddInvoice = () => {
   const generateInvoiceNumber = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:5000/invoices"
+        `${import.meta.env.VITE_API_URL}/invoices`
       );
 
       const invoices = res.data;
@@ -252,7 +252,7 @@ export const AddInvoice = () => {
 
     try {
       await axios.post(
-        "http://localhost:5000/invoices",
+        `${import.meta.env.VITE_API_URL}/invoices`,
         invoiceData
       );
 
