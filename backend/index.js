@@ -13,6 +13,7 @@ const Product = require("./models/Product");
 const Expense = require("./models/Expense");
 const Customer = require("./models/Customer")
 const Invoice = require("./models/Invoice");
+const Counter = require("./models/Counter");
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("mongodb connected"))
@@ -79,11 +80,11 @@ app.put("/categories/:id",async(req,res)=>{
         res.status(500).send(err)
     }
 })
+// PRODUTCS
 app.post("/products", async (req, res) => {
   try {
     const {
       name,
-      code,
       category,
       purchasePrice,
       sellingPrice,
@@ -94,6 +95,20 @@ app.post("/products", async (req, res) => {
       description,
       image,
     } = req.body;
+
+    // Get the next permanent product number
+    const counter = await Counter.findOneAndUpdate(
+      { name: "product" },
+      { $inc: { value: 1 } },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true,
+      }
+    );
+
+    // Generate automatic product code
+    const code = `PR-${String(counter.value).padStart(2, "0")}`;
 
     const product = new Product({
       name,
@@ -118,7 +133,6 @@ app.post("/products", async (req, res) => {
     res.status(500).send(error.message);
   }
 });
-
 app.get("/products", async (req, res) => {
   try {
     const products = await Product.find();
@@ -130,7 +144,25 @@ app.get("/products", async (req, res) => {
     res.status(500).send(error.message);
   }
 });
+app.get("/products/next-code", async (req, res) => {
+  try {
+    const counter = await Counter.findOne({
+      name: "product",
+    });
 
+    const nextNumber = counter ? counter.value + 1 : 1;
+
+    const nextCode = `PR-${String(nextNumber).padStart(2, "0")}`;
+
+    res.send({
+      code: nextCode,
+    });
+
+  } catch (error) {
+    console.log("Next product code error:", error);
+    res.status(500).send(error.message);
+  }
+});
 app.get("/products/:id", async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -162,16 +194,49 @@ app.delete("/products/:id", async (req, res) => {
     res.status(500).send(error.message);
   }
 });
-app.put("/products/:id",async(req,res)=>{
-    try {
-        const updateProduct=await Product.findByIdAndUpdate(req.params.id,req.body,
-            {new:true})
-            res.send(updateProduct)
+app.put("/products/:id", async (req, res) => {
+  try {
+    const {
+      name,
+      category,
+      purchasePrice,
+      sellingPrice,
+      tax,
+      unit,
+      openingStock,
+      minimumStock,
+      description,
+      image,
+    } = req.body;
+
+    const updateProduct = await Product.findByIdAndUpdate(
+      req.params.id,
+      {
+        name,
+        category,
+        purchasePrice,
+        sellingPrice,
+        tax,
+        unit,
+        openingStock,
+        minimumStock,
+        description,
+        image,
+      },
+      { new: true }
+    );
+
+    if (!updateProduct) {
+      return res.status(404).send("Product not found");
     }
-    catch(err){
-        res.status(500).send(err)
-    }
-})
+
+    res.send(updateProduct);
+
+  } catch (error) {
+    console.log("Update product error:", error);
+    res.status(500).send(error.message);
+  }
+});
 
 // ================= EXPENSES =================
 
