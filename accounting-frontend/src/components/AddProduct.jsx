@@ -604,8 +604,7 @@ useEffect(() => {
                 <Form.Group>
                   <Form.Label style={styles.label}>
                     Minimum stock level
-                    <span style={styles.required}>*</span>
-                  </Form.Label>
+                   </Form.Label>
 
                   <Form.Control
                     type="number"
@@ -615,7 +614,7 @@ useEffect(() => {
                     placeholder="e.g. 10"
                     min="0"
                     style={styles.input}
-                    required
+                     
                   />
 
                   <div style={styles.helpText}>

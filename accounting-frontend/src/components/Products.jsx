@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Button, Card, Table } from "react-bootstrap";
+import { Button, Card, Table, Offcanvas  } from "react-bootstrap";
 import axios from "axios";
 import {
   BsPlus,
@@ -16,6 +16,9 @@ import {
   BsFunnel,
   BsChevronLeft,
   BsChevronRight,
+
+  BsArrowLeft,
+  BsPlusCircle,
 } from "react-icons/bs";
 
 /* =========================================================
@@ -29,7 +32,7 @@ const formatMoney = (value) =>
   });
 
 const getStatus = (product) => {
-  const stock = Number(product.openingStock || 0);
+  const stock = Number(product.currentStock || 0);
   const min = Number(product.minimumStock || 0);
 
   if (stock === 0) return "Out of Stock";
@@ -80,7 +83,14 @@ export const Products = () => {
   const [toDate, setToDate] = useState("");
 
   const [currentPage, setCurrentPage] = useState(1);
+const [selectedProduct, setSelectedProduct] = useState(null);
+const [showOffcanvas, setShowOffcanvas] = useState(false);
+const [showAdjustForm, setShowAdjustForm] = useState(false);
 
+const [stockType, setStockType] = useState("increase");
+const [stockQuantity, setStockQuantity] = useState("");
+const [stockNotes, setStockNotes] = useState("");
+const [savingStock, setSavingStock] = useState(false);
   const itemsPerPage = 8;
 
   /* =======================================================
@@ -202,7 +212,7 @@ export const Products = () => {
     (sum, product) =>
       sum +
       Number(product.purchasePrice || 0) *
-        Number(product.openingStock || 0),
+        Number(product.currentStock || 0),
     0
   );
 
@@ -220,7 +230,102 @@ export const Products = () => {
     statusFilter ||
     fromDate ||
     toDate;
+/* =======================================================
+   PRODUCT DETAILS / STOCK ADJUSTMENT
+======================================================= */
 
+const resetStockForm = () => {
+  setStockType("increase");
+  setStockQuantity("");
+  setStockNotes("");
+};
+
+const handleProductClick = (product) => {
+  setSelectedProduct(product);
+  setShowOffcanvas(true);
+  setShowAdjustForm(false);
+  resetStockForm();
+};
+
+const handleCloseOffcanvas = () => {
+  setShowOffcanvas(false);
+  setShowAdjustForm(false);
+  setSelectedProduct(null);
+  resetStockForm();
+};
+
+const handleOpenAdjustForm = () => {
+  resetStockForm();
+  setShowAdjustForm(true);
+};
+
+const handleSaveStockAdjustment = async () => {
+  const quantity = Number(stockQuantity);
+
+  if (!quantity || quantity <= 0) {
+    alert("Please enter a valid quantity.");
+    return;
+  }
+
+  if (!selectedProduct) {
+    return;
+  }
+
+  const currentStock = Number(
+    selectedProduct.currentStock || 0
+  );
+
+  if (
+    stockType === "decrease" &&
+    quantity > currentStock
+  ) {
+    alert(
+      `Cannot decrease stock by ${quantity}. Current stock is ${currentStock}.`
+    );
+    return;
+  }
+
+  try {
+    setSavingStock(true);
+
+    const response = await axios.patch(
+      `${import.meta.env.VITE_API_URL}/products/${selectedProduct._id}/adjust-stock`,
+      {
+        type: stockType,
+        quantity,
+        notes: stockNotes,
+      }
+    );
+
+    const updatedProduct = response.data.product;
+
+    setProducts((prevProducts) =>
+      prevProducts.map((product) =>
+        product._id === updatedProduct._id
+          ? updatedProduct
+          : product
+      )
+    );
+
+    setSelectedProduct(updatedProduct);
+
+    setShowAdjustForm(false);
+    resetStockForm();
+
+ } catch (error) {
+  console.log("Stock adjustment error:", error);
+  console.log("Status:", error.response?.status);
+  console.log("Response:", error.response?.data);
+
+  alert(
+    error.response?.data?.message ||
+    error.response?.data ||
+    error.message ||
+    "Unable to adjust stock."
+  );
+} finally {
+  setSavingStock(false);
+}}
   /* =======================================================
      DELETE
   ======================================================= */
@@ -337,7 +442,30 @@ export const Products = () => {
 
   return (
     <div style={styles.page}>
+<style>{`
+  .product-offcanvas {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: auto !important;
 
+    width: 360px !important;
+    max-width: 100% !important;
+
+    z-index: 1100 !important;
+  }
+
+  .product-offcanvas.show {
+    visibility: visible !important;
+  }
+
+  .offcanvas-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 1090 !important;
+  }
+`}</style>
       {/* ===================================================
           HEADER
       =================================================== */}
@@ -800,7 +928,7 @@ export const Products = () => {
                     getStatus(product);
 
                   const stock =
-                    Number(product.openingStock || 0);
+                    Number(product.currentStock || 0);
 
                   const minimum =
                     Number(product.minimumStock || 0);
@@ -812,7 +940,13 @@ export const Products = () => {
 
                       <td style={styles.td}>
 
-                        <div style={styles.productCell}>
+                        <div
+  style={{
+    ...styles.productCell,
+    cursor: "pointer",
+  }}
+  onClick={() => handleProductClick(product)}
+>
 
                           {product.image ? (
 
@@ -1183,10 +1317,464 @@ export const Products = () => {
 
         )}
 
-      </Card>
+       </Card>
+
+      {/* =================================================
+          PRODUCT DETAILS / STOCK ADJUSTMENT OFFCANVAS
+      ================================================= */}
+
+      <Offcanvas
+  show={showOffcanvas}
+  onHide={handleCloseOffcanvas}
+  placement="end"
+  className="product-offcanvas"
+      >
+        <Offcanvas.Header
+          closeButton
+          style={styles.offcanvasHeader}
+        >
+          <Offcanvas.Title style={styles.offcanvasTitle}>
+            {showAdjustForm
+              ? "Adjust Stock"
+              : "Product Details"}
+          </Offcanvas.Title>
+        </Offcanvas.Header>
+
+        <Offcanvas.Body style={styles.offcanvasBody}>
+
+          {selectedProduct && !showAdjustForm && (
+            <>
+              {/* PRODUCT HEADER */}
+
+              <div style={styles.detailProductHeader}>
+
+                {selectedProduct.image ? (
+                  <img
+                    src={selectedProduct.image}
+                    alt={selectedProduct.name}
+                    style={styles.detailProductImage}
+                  />
+                ) : (
+                  <div style={styles.detailProductIcon}>
+                    <BsBoxSeam size={24} />
+                  </div>
+                )}
+
+                <div style={styles.detailProductInfo}>
+                  <div style={styles.detailProductName}>
+                    {selectedProduct.name}
+                  </div>
+
+                  <div style={styles.detailProductCode}>
+                    {selectedProduct.code
+                      ? `SKU ${selectedProduct.code}`
+                      : `ID ${String(
+                          selectedProduct._id
+                        ).slice(-6)}`}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* STOCK SUMMARY */}
+
+              <div style={styles.stockSummaryCard}>
+
+                <div>
+                  <div style={styles.stockSummaryLabel}>
+                    Current Stock
+                  </div>
+
+                  <div style={styles.stockSummaryNumber}>
+                    {Number(
+                      selectedProduct.currentStock || 0
+                    )}
+                    <span style={styles.stockSummaryUnit}>
+                      {" "}
+                      {selectedProduct.unit || "units"}
+                    </span>
+                  </div>
+                </div>
+
+                <span
+                  style={{
+                    ...styles.badge,
+                    ...(getStatus(selectedProduct) === "In Stock"
+                      ? styles.badgeSuccess
+                      : getStatus(selectedProduct) === "Low Stock"
+                      ? styles.badgeWarning
+                      : styles.badgeDanger),
+                  }}
+                >
+                  <span style={styles.badgeDot} />
+                  {getStatus(selectedProduct)}
+                </span>
+
+              </div>
+
+              {/* PRODUCT INFORMATION */}
+
+              <div style={styles.detailSection}>
+
+                <div style={styles.detailSectionTitle}>
+                  Product Information
+                </div>
+
+                <div style={styles.detailGrid}>
+
+                  <div style={styles.detailItem}>
+                    <span style={styles.detailLabel}>
+                      Category
+                    </span>
+                    <span style={styles.detailValue}>
+                      {selectedProduct.category ||
+                        "Uncategorized"}
+                    </span>
+                  </div>
+
+                  <div style={styles.detailItem}>
+                    <span style={styles.detailLabel}>
+                      Unit
+                    </span>
+                    <span style={styles.detailValue}>
+                      {selectedProduct.unit || "—"}
+                    </span>
+                  </div>
+
+                  <div style={styles.detailItem}>
+                    <span style={styles.detailLabel}>
+                      Purchase Price
+                    </span>
+                    <span style={styles.detailValue}>
+                      {formatMoney(
+                        selectedProduct.purchasePrice
+                      )}
+                    </span>
+                  </div>
+
+                  <div style={styles.detailItem}>
+                    <span style={styles.detailLabel}>
+                      Selling Price
+                    </span>
+                    <span
+                      style={{
+                        ...styles.detailValue,
+                        fontWeight: "600",
+                        color: "#1e293b",
+                      }}
+                    >
+                      {formatMoney(
+                        selectedProduct.sellingPrice
+                      )}
+                    </span>
+                  </div>
+
+                  <div style={styles.detailItem}>
+                    <span style={styles.detailLabel}>
+                      Minimum Stock
+                    </span>
+                    <span style={styles.detailValue}>
+                      {Number(
+                        selectedProduct.minimumStock || 0
+                      )}
+                    </span>
+                  </div>
+
+                  <div style={styles.detailItem}>
+                    <span style={styles.detailLabel}>
+                      Opening Stock
+                    </span>
+                    <span style={styles.detailValue}>
+                      {Number(
+                        selectedProduct.openingStock || 0
+                      )}
+                    </span>
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* DESCRIPTION */}
+
+              {selectedProduct.description && (
+                <div style={styles.detailSection}>
+
+                  <div style={styles.detailSectionTitle}>
+                    Description
+                  </div>
+
+                  <div style={styles.descriptionText}>
+                    {selectedProduct.description}
+                  </div>
+
+                </div>
+              )}
+
+              {/* ACTION */}
+
+<div
+  style={{
+    display: "flex",
+    gap: "8px",
+    marginTop: "18px",
+  }}
+>
+  <Button
+    onClick={handleOpenAdjustForm}
+    style={{
+      flex: 1,
+      border: "none",
+      backgroundColor: "#3b6b9d",
+      fontSize: "12px",
+      fontWeight: "600",
+      padding: "9px 12px",
+      borderRadius: "6px",
+    }}
+  >
+    <BsArrowCounterclockwise
+      size={14}
+      style={{ marginRight: "6px" }}
+    />
+    Adjust Stock
+  </Button>
+
+  <Button
+    onClick={handleCloseOffcanvas}
+    variant="light"
+    style={{
+      padding: "9px 16px",
+      border: "1px solid #d9dee7",
+      color: "#475569",
+      backgroundColor: "#ffffff",
+      fontSize: "12px",
+      fontWeight: "600",
+      borderRadius: "6px",
+    }}
+  >
+    Close
+  </Button>
+</div>
+            </>
+          )}
+
+          {selectedProduct && showAdjustForm && (
+            <>
+              {/* BACK */}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdjustForm(false);
+                  resetStockForm();
+                }}
+                style={styles.backButton}
+              >
+                <BsArrowLeft size={14} />
+                Back to Product
+              </button>
+
+              {/* PRODUCT */}
+
+              <div style={styles.adjustProductCard}>
+
+                <div style={styles.adjustProductIcon}>
+                  <BsBoxSeam size={18} />
+                </div>
+
+                <div>
+                  <div style={styles.adjustProductName}>
+                    {selectedProduct.name}
+                  </div>
+
+                  <div style={styles.adjustProductCode}>
+                    {selectedProduct.code
+                      ? `SKU ${selectedProduct.code}`
+                      : ""}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* CURRENT STOCK */}
+
+              <div style={styles.currentStockBox}>
+
+                <span style={styles.currentStockLabel}>
+                  Current Stock
+                </span>
+
+                <strong style={styles.currentStockValue}>
+                  {Number(
+                    selectedProduct.currentStock || 0
+                  )}{" "}
+                  <span>
+                    {selectedProduct.unit || "units"}
+                  </span>
+                </strong>
+
+              </div>
+
+              {/* ADJUSTMENT FORM */}
+
+              <div style={styles.formSection}>
+
+                <label style={styles.formLabel}>
+                  Stock Adjustment
+                </label>
+
+                <select
+                  value={stockType}
+                  onChange={(e) =>
+                    setStockType(e.target.value)
+                  }
+                  style={styles.formInput}
+                >
+                  <option value="increase">
+                    Increased Stock
+                  </option>
+
+                  <option value="decrease">
+                    Decreased Stock
+                  </option>
+                </select>
+
+              </div>
+
+              <div style={styles.formSection}>
+
+                <label style={styles.formLabel}>
+                  Quantity
+                </label>
+
+                <input
+                  type="number"
+                  min="1"
+                  value={stockQuantity}
+                  onChange={(e) =>
+                    setStockQuantity(e.target.value)
+                  }
+                  placeholder="Enter quantity"
+                  style={styles.formInput}
+                />
+
+              </div>
+
+              <div style={styles.formSection}>
+
+                <label style={styles.formLabel}>
+                  Notes
+                  <span style={styles.optionalLabel}>
+                    Optional
+                  </span>
+                </label>
+
+                <textarea
+                  value={stockNotes}
+                  onChange={(e) =>
+                    setStockNotes(e.target.value)
+                  }
+                  placeholder="Reason for stock adjustment..."
+                  rows={4}
+                  style={styles.formTextarea}
+                />
+
+              </div>
+
+              {/* PREVIEW */}
+
+              {stockQuantity &&
+                Number(stockQuantity) > 0 && (
+                  <div style={styles.previewCard}>
+
+                    <div style={styles.previewTitle}>
+                      Stock Preview
+                    </div>
+
+                    <div style={styles.previewRow}>
+                      <span>Current Stock</span>
+                      <strong>
+                        {Number(
+                          selectedProduct.currentStock || 0
+                        )}
+                      </strong>
+                    </div>
+
+                    <div style={styles.previewRow}>
+                      <span>Adjustment</span>
+
+                      <strong
+                        style={{
+                          color:
+                            stockType === "increase"
+                              ? "#15803d"
+                              : "#b91c1c",
+                        }}
+                      >
+                        {stockType === "increase"
+                          ? "+"
+                          : "-"}
+                        {Number(stockQuantity)}
+                      </strong>
+                    </div>
+
+                    <div style={styles.previewDivider} />
+
+                    <div style={styles.previewRow}>
+                      <span>New Stock</span>
+
+                      <strong style={styles.previewNewStock}>
+                        {Math.max(
+                          0,
+                          Number(
+                            selectedProduct.currentStock || 0
+                          ) +
+                            (stockType === "increase"
+                              ? Number(stockQuantity)
+                              : -Number(stockQuantity))
+                        )}
+                      </strong>
+                    </div>
+
+                  </div>
+                )}
+
+              {/* BUTTONS */}
+
+              <div style={styles.adjustActions}>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdjustForm(false);
+                    resetStockForm();
+                  }}
+                  style={styles.cancelAdjustButton}
+                  disabled={savingStock}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveStockAdjustment}
+                  style={styles.saveAdjustButton}
+                  disabled={savingStock}
+                >
+                  {savingStock
+                    ? "Saving..."
+                    : "Save Adjustment"}
+                </button>
+
+              </div>
+            </>
+          )}
+
+        </Offcanvas.Body>
+      </Offcanvas>
 
     </div>
-  );
+   );
 };
 
 /* =========================================================
@@ -1755,7 +2343,365 @@ const styles = {
     gap: "6px",
     cursor: "pointer",
   },
+  /* =======================================================
+     PRODUCT DETAILS OFFCANVAS
+  ======================================================= */
 
+ 
+
+  offcanvasHeader: {
+    padding: "14px 16px",
+    borderBottom: "1px solid #e7ebf0",
+    backgroundColor: "#ffffff",
+  },
+
+  offcanvasTitle: {
+    fontSize: "13px",
+    fontWeight: "600",
+    color: "#172033",
+  },
+
+  offcanvasBody: {
+    padding: "16px",
+    backgroundColor: "#ffffff",
+  },
+
+  detailProductHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    paddingBottom: "14px",
+    borderBottom: "1px solid #edf1f5",
+  },
+
+  detailProductImage: {
+    width: "58px",
+    height: "58px",
+    borderRadius: "9px",
+    objectFit: "cover",
+    border: "1px solid #e1e7ed",
+    flexShrink: 0,
+  },
+
+  detailProductIcon: {
+    width: "58px",
+    height: "58px",
+    borderRadius: "9px",
+    backgroundColor: "#eaf1f8",
+    color: "#3b6b9d",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+
+  detailProductInfo: {
+    minWidth: 0,
+  },
+
+  detailProductName: {
+    fontSize: "15px",
+    fontWeight: "650",
+    color: "#172033",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+
+  detailProductCode: {
+    marginTop: "4px",
+    fontSize: "10px",
+    color: "#94a3b8",
+  },
+
+  stockSummaryCard: {
+    marginTop: "18px",
+    padding: "16px",
+    border: "1px solid #e1e7ed",
+    borderRadius: "9px",
+    backgroundColor: "#f8fafc",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+  },
+
+  stockSummaryLabel: {
+    fontSize: "10px",
+    color: "#7b8797",
+    fontWeight: "500",
+  },
+
+  stockSummaryNumber: {
+    marginTop: "4px",
+    fontSize: "25px",
+    lineHeight: "28px",
+    fontWeight: "700",
+    color: "#172033",
+    fontVariantNumeric: "tabular-nums",
+  },
+
+  stockSummaryUnit: {
+    fontSize: "11px",
+    color: "#94a3b8",
+    fontWeight: "500",
+  },
+
+  detailSection: {
+    marginTop: "22px",
+  },
+
+  detailSectionTitle: {
+    marginBottom: "12px",
+    fontSize: "11px",
+    fontWeight: "600",
+    color: "#526173",
+    textTransform: "uppercase",
+    letterSpacing: "0.3px",
+  },
+
+  detailGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    border: "1px solid #e7ebf0",
+    borderRadius: "8px",
+    overflow: "hidden",
+  },
+
+  detailItem: {
+    padding: "12px",
+    borderBottom: "1px solid #edf1f5",
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+
+  detailLabel: {
+    fontSize: "10px",
+    color: "#94a3b8",
+  },
+
+  detailValue: {
+    fontSize: "11px",
+    color: "#526173",
+    fontWeight: "500",
+  },
+
+  descriptionText: {
+    padding: "12px",
+    border: "1px solid #e7ebf0",
+    borderRadius: "8px",
+    fontSize: "11px",
+    lineHeight: "18px",
+    color: "#64748b",
+    backgroundColor: "#fafbfc",
+  },
+
+  detailActionSection: {
+    marginTop: "25px",
+  },
+
+  adjustStockButton: {
+    width: "100%",
+    height: "40px",
+    border: "none",
+    borderRadius: "7px",
+    backgroundColor: "#3b6b9d",
+    color: "#ffffff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "7px",
+    fontSize: "12px",
+    fontWeight: "600",
+  },
+
+  /* =======================================================
+     STOCK ADJUSTMENT FORM
+  ======================================================= */
+
+  backButton: {
+    border: "none",
+    backgroundColor: "transparent",
+    padding: 0,
+    color: "#64748b",
+    fontSize: "11px",
+    fontWeight: "500",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    cursor: "pointer",
+  },
+
+  adjustProductCard: {
+    marginTop: "18px",
+    padding: "13px",
+    border: "1px solid #e1e7ed",
+    borderRadius: "8px",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+
+  adjustProductIcon: {
+    width: "38px",
+    height: "38px",
+    borderRadius: "7px",
+    backgroundColor: "#eaf1f8",
+    color: "#3b6b9d",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+
+  adjustProductName: {
+    fontSize: "12px",
+    fontWeight: "600",
+    color: "#1e293b",
+  },
+
+  adjustProductCode: {
+    marginTop: "3px",
+    fontSize: "10px",
+    color: "#94a3b8",
+  },
+
+  currentStockBox: {
+    marginTop: "14px",
+    padding: "13px 14px",
+    backgroundColor: "#f8fafc",
+    borderRadius: "8px",
+    border: "1px solid #e7ebf0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  currentStockLabel: {
+    fontSize: "11px",
+    color: "#64748b",
+  },
+
+  currentStockValue: {
+    fontSize: "15px",
+    color: "#172033",
+    fontVariantNumeric: "tabular-nums",
+  },
+
+  formSection: {
+    marginTop: "18px",
+  },
+
+  formLabel: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "7px",
+    fontSize: "11px",
+    fontWeight: "600",
+    color: "#475569",
+  },
+
+  optionalLabel: {
+    color: "#a0aab7",
+    fontSize: "9px",
+    fontWeight: "400",
+  },
+
+  formInput: {
+    width: "100%",
+    height: "38px",
+    padding: "0 10px",
+    border: "1px solid #d5dce5",
+    borderRadius: "7px",
+    outline: "none",
+    backgroundColor: "#ffffff",
+    color: "#475569",
+    fontSize: "12px",
+    boxSizing: "border-box",
+  },
+
+  formTextarea: {
+    width: "100%",
+    padding: "10px",
+    border: "1px solid #d5dce5",
+    borderRadius: "7px",
+    outline: "none",
+    backgroundColor: "#ffffff",
+    color: "#475569",
+    fontSize: "12px",
+    resize: "vertical",
+    boxSizing: "border-box",
+    fontFamily: FONT,
+  },
+
+  previewCard: {
+    marginTop: "20px",
+    padding: "14px",
+    border: "1px solid #e1e7ed",
+    borderRadius: "8px",
+    backgroundColor: "#f8fafc",
+  },
+
+  previewTitle: {
+    marginBottom: "11px",
+    fontSize: "10px",
+    fontWeight: "600",
+    color: "#64748b",
+    textTransform: "uppercase",
+    letterSpacing: "0.3px",
+  },
+
+  previewRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "5px 0",
+    fontSize: "11px",
+    color: "#7b8797",
+  },
+
+  previewDivider: {
+    height: "1px",
+    backgroundColor: "#e1e7ed",
+    margin: "6px 0",
+  },
+
+  previewNewStock: {
+    fontSize: "14px",
+    color: "#172033",
+  },
+
+  adjustActions: {
+    display: "flex",
+    gap: "8px",
+    marginTop: "25px",
+  },
+
+  cancelAdjustButton: {
+    flex: 1,
+    height: "39px",
+    border: "1px solid #d5dce5",
+    backgroundColor: "#ffffff",
+    color: "#475569",
+    borderRadius: "7px",
+    fontSize: "12px",
+    fontWeight: "500",
+    cursor: "pointer",
+  },
+
+  saveAdjustButton: {
+    flex: 1.5,
+    height: "39px",
+    border: "none",
+    backgroundColor: "#3b6b9d",
+    color: "#ffffff",
+    borderRadius: "7px",
+    fontSize: "12px",
+    fontWeight: "600",
+    cursor: "pointer",
+  },
   /* =======================================================
      PAGINATION
   ======================================================= */

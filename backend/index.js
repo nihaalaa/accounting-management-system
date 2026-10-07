@@ -119,6 +119,7 @@ app.post("/products", async (req, res) => {
       tax,
       unit,
       openingStock,
+        currentStock: openingStock,
       minimumStock,
       description,
       image,
@@ -237,7 +238,62 @@ app.put("/products/:id", async (req, res) => {
     res.status(500).send(error.message);
   }
 });
+app.patch("/products/:id/adjust-stock", async (req, res) => {
+  try {
+    const { type, quantity, notes } = req.body;
 
+    if (!["increase", "decrease"].includes(type)) {
+      return res.status(400).send("Invalid stock adjustment type");
+    }
+
+    if (!quantity || Number(quantity) <= 0) {
+      return res.status(400).send("Quantity must be greater than 0");
+    }
+
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).send("Product not found");
+    }
+
+    const adjustmentQuantity = Number(quantity);
+    const previousStock = Number(product.currentStock || 0);
+
+    let newStock;
+
+    if (type === "increase") {
+      newStock = previousStock + adjustmentQuantity;
+    } else {
+      newStock = previousStock - adjustmentQuantity;
+    }
+
+    if (newStock < 0) {
+      return res.status(400).send(
+        `Cannot decrease stock by ${adjustmentQuantity}. Current stock is ${previousStock}.`
+      );
+    }
+
+    product.currentStock = newStock;
+
+    await product.save();
+
+    res.send({
+      message: "Stock adjusted successfully",
+      product,
+      adjustment: {
+        type,
+        quantity: adjustmentQuantity,
+        previousStock,
+        newStock,
+        notes: notes || "",
+      },
+    });
+  } catch (error) {
+    console.log("Stock adjustment error:", error);
+    res.status(500).send(error.message);
+  }
+});
+ 
 // ================= EXPENSES =================
 
 // ADD EXPENSE

@@ -49,12 +49,15 @@ const productSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-
-    minimumStock: {
+    
+    currentStock: {
       type: Number,
       required: true,
       min: 0,
     },
+    minimumStock: {
+      type: Number,
+     },
 
     description: {
       type: String,
