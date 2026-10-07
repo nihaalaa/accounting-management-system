@@ -109,6 +109,21 @@ export const AddProduct = () => {
       });
   }, []);
 
+//code generating-autofill-code
+useEffect(() => {
+  axios
+    .get(`${import.meta.env.VITE_API_URL}/products/next-code`)
+    .then((res) => {
+      setProduct((prev) => ({
+        ...prev,
+        code: res.data.code,
+      }));
+    })
+    .catch((err) => {
+      console.log("Error fetching product code:", err);
+      setError("Unable to generate product code.");
+    });
+}, []);
   /* =========================================================
      HANDLE INPUT
   ========================================================= */
@@ -194,11 +209,6 @@ export const AddProduct = () => {
 
     if (!product.name.trim()) {
       setError("Please enter a product name.");
-      return;
-    }
-
-    if (!product.code.trim()) {
-      setError("Please enter a product code / SKU.");
       return;
     }
 
@@ -381,22 +391,30 @@ export const AddProduct = () => {
 
                 {/* Product Code */}
 
-                <Form.Group>
-                  <Form.Label style={styles.label}>
-                    Product code / SKU
-                    <span style={styles.required}>*</span>
-                  </Form.Label>
+            <Form.Group>
+              <Form.Label style={styles.label}>
+                Product code / SKU
+                <span style={styles.required}>*</span>
+              </Form.Label>
 
-                  <Form.Control
-                    type="text"
-                    name="code"
-                    value={product.code}
-                    onChange={handleChange}
-                    placeholder="e.g. PROD-001"
-                    style={styles.input}
-                    required
-                  />
-                </Form.Group>
+              <Form.Control
+                type="text"
+                name="code"
+                value={product.code}
+                style={{
+                  ...styles.input,
+                  backgroundColor: "#f8fafc",
+                  color: "#64748b",
+                  cursor: "not-allowed",
+                }}
+                readOnly
+                required
+              />
+
+              <div style={styles.helpText}>
+                Automatically generated. This code cannot be changed.
+              </div>
+            </Form.Group>
 
                 {/* Category */}
 
