@@ -443,18 +443,38 @@ const handleSaveStockAdjustment = async () => {
   return (
     <div style={styles.page}>
 <style>{`
-  .product-offcanvas {
-    position: fixed !important;
-    top: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    left: auto !important;
+.product-offcanvas {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: auto !important;
 
-    width: 360px !important;
-    max-width: 100% !important;
+  width: 360px !important;
+  max-width: 100% !important;
 
-    z-index: 1100 !important;
-  }
+  height: 100vh !important;
+  max-height: 100vh !important;
+
+  z-index: 1100 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.product-offcanvas .offcanvas-header {
+  flex-shrink: 0 !important;
+}
+
+.product-offcanvas .offcanvas-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+
+  overflow: hidden !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+}
 
   .product-offcanvas.show {
     visibility: visible !important;
@@ -1328,6 +1348,9 @@ const handleSaveStockAdjustment = async () => {
   onHide={handleCloseOffcanvas}
   placement="end"
   className="product-offcanvas"
+  style={{
+    height: "100vh",
+  }}
       >
         <Offcanvas.Header
           closeButton
@@ -1340,437 +1363,453 @@ const handleSaveStockAdjustment = async () => {
           </Offcanvas.Title>
         </Offcanvas.Header>
 
-        <Offcanvas.Body style={styles.offcanvasBody}>
-
-          {selectedProduct && !showAdjustForm && (
-            <>
-              {/* PRODUCT HEADER */}
-
-              <div style={styles.detailProductHeader}>
-
-                {selectedProduct.image ? (
-                  <img
-                    src={selectedProduct.image}
-                    alt={selectedProduct.name}
-                    style={styles.detailProductImage}
-                  />
-                ) : (
-                  <div style={styles.detailProductIcon}>
-                    <BsBoxSeam size={24} />
-                  </div>
-                )}
-
-                <div style={styles.detailProductInfo}>
-                  <div style={styles.detailProductName}>
-                    {selectedProduct.name}
-                  </div>
-
-                  <div style={styles.detailProductCode}>
-                    {selectedProduct.code
-                      ? `SKU ${selectedProduct.code}`
-                      : `ID ${String(
-                          selectedProduct._id
-                        ).slice(-6)}`}
-                  </div>
-                </div>
-
-              </div>
-
-              {/* STOCK SUMMARY */}
-
-              <div style={styles.stockSummaryCard}>
-
-                <div>
-                  <div style={styles.stockSummaryLabel}>
-                    Current Stock
-                  </div>
-
-                  <div style={styles.stockSummaryNumber}>
-                    {Number(
-                      selectedProduct.currentStock || 0
-                    )}
-                    <span style={styles.stockSummaryUnit}>
-                      {" "}
-                      {selectedProduct.unit || "units"}
-                    </span>
-                  </div>
-                </div>
-
-                <span
-                  style={{
-                    ...styles.badge,
-                    ...(getStatus(selectedProduct) === "In Stock"
-                      ? styles.badgeSuccess
-                      : getStatus(selectedProduct) === "Low Stock"
-                      ? styles.badgeWarning
-                      : styles.badgeDanger),
-                  }}
-                >
-                  <span style={styles.badgeDot} />
-                  {getStatus(selectedProduct)}
-                </span>
-
-              </div>
-
-              {/* PRODUCT INFORMATION */}
-
-              <div style={styles.detailSection}>
-
-                <div style={styles.detailSectionTitle}>
-                  Product Information
-                </div>
-
-                <div style={styles.detailGrid}>
-
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>
-                      Category
-                    </span>
-                    <span style={styles.detailValue}>
-                      {selectedProduct.category ||
-                        "Uncategorized"}
-                    </span>
-                  </div>
-
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>
-                      Unit
-                    </span>
-                    <span style={styles.detailValue}>
-                      {selectedProduct.unit || "—"}
-                    </span>
-                  </div>
-
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>
-                      Purchase Price
-                    </span>
-                    <span style={styles.detailValue}>
-                      {formatMoney(
-                        selectedProduct.purchasePrice
-                      )}
-                    </span>
-                  </div>
-
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>
-                      Selling Price
-                    </span>
-                    <span
-                      style={{
-                        ...styles.detailValue,
-                        fontWeight: "600",
-                        color: "#1e293b",
-                      }}
-                    >
-                      {formatMoney(
-                        selectedProduct.sellingPrice
-                      )}
-                    </span>
-                  </div>
-
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>
-                      Minimum Stock
-                    </span>
-                    <span style={styles.detailValue}>
-                      {Number(
-                        selectedProduct.minimumStock || 0
-                      )}
-                    </span>
-                  </div>
-
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>
-                      Opening Stock
-                    </span>
-                    <span style={styles.detailValue}>
-                      {Number(
-                        selectedProduct.openingStock || 0
-                      )}
-                    </span>
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* DESCRIPTION */}
-
-              {selectedProduct.description && (
-                <div style={styles.detailSection}>
-
-                  <div style={styles.detailSectionTitle}>
-                    Description
-                  </div>
-
-                  <div style={styles.descriptionText}>
-                    {selectedProduct.description}
-                  </div>
-
-                </div>
-              )}
-
-              {/* ACTION */}
-
-<div
+<Offcanvas.Body
   style={{
+    ...styles.offcanvasBody,
+    overflow: "hidden",
     display: "flex",
-    gap: "8px",
-    marginTop: "18px",
+    flexDirection: "column",
+    padding: "20px",
   }}
 >
-  <Button
-    onClick={handleOpenAdjustForm}
-    style={{
-      flex: 1,
-      border: "none",
-      backgroundColor: "#3b6b9d",
-      fontSize: "12px",
-      fontWeight: "600",
-      padding: "9px 12px",
-      borderRadius: "6px",
-    }}
-  >
-    <BsArrowCounterclockwise
-      size={14}
-      style={{ marginRight: "6px" }}
-    />
-    Adjust Stock
-  </Button>
+  {/* ================= PRODUCT DETAILS ================= */}
 
-  <Button
-    onClick={handleCloseOffcanvas}
-    variant="light"
-    style={{
-      padding: "9px 16px",
-      border: "1px solid #d9dee7",
-      color: "#475569",
-      backgroundColor: "#ffffff",
-      fontSize: "12px",
-      fontWeight: "600",
-      borderRadius: "6px",
-    }}
-  >
-    Close
-  </Button>
-</div>
-            </>
-          )}
+  {selectedProduct && !showAdjustForm && (
+    <div
+      style={{
+        height: "100%",
+        overflowY: "auto",
+        paddingBottom: "10px",
+      }}
+    >
+      {/* PRODUCT HEADER */}
 
-          {selectedProduct && showAdjustForm && (
-            <>
-              {/* BACK */}
+      <div style={styles.detailProductHeader}>
+        {selectedProduct.image ? (
+          <img
+            src={selectedProduct.image}
+            alt={selectedProduct.name}
+            style={styles.detailProductImage}
+          />
+        ) : (
+          <div style={styles.detailProductIcon}>
+            <BsBoxSeam size={24} />
+          </div>
+        )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAdjustForm(false);
-                  resetStockForm();
-                }}
-                style={styles.backButton}
-              >
-                <BsArrowLeft size={14} />
-                Back to Product
-              </button>
+        <div style={styles.detailProductInfo}>
+          <div style={styles.detailProductName}>
+            {selectedProduct.name}
+          </div>
 
-              {/* PRODUCT */}
+          <div style={styles.detailProductCode}>
+            {selectedProduct.code
+              ? `SKU ${selectedProduct.code}`
+              : `ID ${String(selectedProduct._id).slice(-6)}`}
+          </div>
+        </div>
+      </div>
 
-              <div style={styles.adjustProductCard}>
+      {/* STOCK SUMMARY */}
 
-                <div style={styles.adjustProductIcon}>
-                  <BsBoxSeam size={18} />
-                </div>
+      <div style={styles.stockSummaryCard}>
+        <div>
+          <div style={styles.stockSummaryLabel}>
+            Current Stock
+          </div>
 
-                <div>
-                  <div style={styles.adjustProductName}>
-                    {selectedProduct.name}
-                  </div>
+          <div style={styles.stockSummaryNumber}>
+            {Number(selectedProduct.currentStock || 0)}
 
-                  <div style={styles.adjustProductCode}>
-                    {selectedProduct.code
-                      ? `SKU ${selectedProduct.code}`
-                      : ""}
-                  </div>
-                </div>
+            <span style={styles.stockSummaryUnit}>
+              {" "}
+              {selectedProduct.unit || "units"}
+            </span>
+          </div>
+        </div>
 
+        <span
+          style={{
+            ...styles.badge,
+            ...(getStatus(selectedProduct) === "In Stock"
+              ? styles.badgeSuccess
+              : getStatus(selectedProduct) === "Low Stock"
+              ? styles.badgeWarning
+              : styles.badgeDanger),
+          }}
+        >
+          <span style={styles.badgeDot} />
+          {getStatus(selectedProduct)}
+        </span>
+      </div>
+
+      {/* PRODUCT INFORMATION */}
+
+      <div style={styles.detailSection}>
+        <div style={styles.detailSectionTitle}>
+          Product Information
+        </div>
+
+        <div style={styles.detailGrid}>
+          <div style={styles.detailItem}>
+            <span style={styles.detailLabel}>
+              Category
+            </span>
+
+            <span style={styles.detailValue}>
+              {selectedProduct.category || "Uncategorized"}
+            </span>
+          </div>
+
+          <div style={styles.detailItem}>
+            <span style={styles.detailLabel}>
+              Unit
+            </span>
+
+            <span style={styles.detailValue}>
+              {selectedProduct.unit || "—"}
+            </span>
+          </div>
+
+          <div style={styles.detailItem}>
+            <span style={styles.detailLabel}>
+              Purchase Price
+            </span>
+
+            <span style={styles.detailValue}>
+              {formatMoney(selectedProduct.purchasePrice)}
+            </span>
+          </div>
+
+          <div style={styles.detailItem}>
+            <span style={styles.detailLabel}>
+              Selling Price
+            </span>
+
+            <span
+              style={{
+                ...styles.detailValue,
+                fontWeight: "600",
+                color: "#1e293b",
+              }}
+            >
+              {formatMoney(selectedProduct.sellingPrice)}
+            </span>
+          </div>
+
+          <div style={styles.detailItem}>
+            <span style={styles.detailLabel}>
+              Minimum Stock
+            </span>
+
+            <span style={styles.detailValue}>
+              {Number(selectedProduct.minimumStock || 0)}
+            </span>
+          </div>
+
+          <div style={styles.detailItem}>
+            <span style={styles.detailLabel}>
+              Opening Stock
+            </span>
+
+            <span style={styles.detailValue}>
+              {Number(selectedProduct.openingStock || 0)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* DESCRIPTION */}
+
+      {selectedProduct.description && (
+        <div style={styles.detailSection}>
+          <div style={styles.detailSectionTitle}>
+            Description
+          </div>
+
+          <div style={styles.descriptionText}>
+            {selectedProduct.description}
+          </div>
+        </div>
+      )}
+
+      {/* ACTION BUTTONS */}
+
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          marginTop: "18px",
+        }}
+      >
+        <Button
+          onClick={handleOpenAdjustForm}
+          style={{
+            flex: 1,
+            border: "none",
+            backgroundColor: "#3b6b9d",
+            fontSize: "12px",
+            fontWeight: "600",
+            padding: "9px 12px",
+            borderRadius: "6px",
+          }}
+        >
+          <BsArrowCounterclockwise
+            size={14}
+            style={{ marginRight: "6px" }}
+          />
+          Adjust Stock
+        </Button>
+
+        <Button
+          onClick={handleCloseOffcanvas}
+          variant="light"
+          style={{
+            padding: "9px 16px",
+            border: "1px solid #d9dee7",
+            color: "#475569",
+            backgroundColor: "#ffffff",
+            fontSize: "12px",
+            fontWeight: "600",
+            borderRadius: "6px",
+          }}
+        >
+          Close
+        </Button>
+      </div>
+    </div>
+  )}
+
+  {/* ================= ADJUST STOCK ================= */}
+
+  {selectedProduct && showAdjustForm && (
+    <div
+      style={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: 0,
+      }}
+    >
+      {/* SCROLLABLE CONTENT */}
+
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          minHeight: 0,
+          paddingBottom: "15px",
+          paddingRight: "3px",
+        }}
+      >
+        {/* BACK */}
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowAdjustForm(false);
+            resetStockForm();
+          }}
+          style={styles.backButton}
+        >
+          <BsArrowLeft size={14} />
+          Back to Product
+        </button>
+
+        {/* PRODUCT */}
+
+        <div style={styles.adjustProductCard}>
+          <div style={styles.adjustProductIcon}>
+            <BsBoxSeam size={18} />
+          </div>
+
+          <div>
+            <div style={styles.adjustProductName}>
+              {selectedProduct.name}
+            </div>
+
+            <div style={styles.adjustProductCode}>
+              {selectedProduct.code
+                ? `SKU ${selectedProduct.code}`
+                : ""}
+            </div>
+          </div>
+        </div>
+
+        {/* CURRENT STOCK */}
+
+        <div style={styles.currentStockBox}>
+          <span style={styles.currentStockLabel}>
+            Current Stock
+          </span>
+
+          <strong style={styles.currentStockValue}>
+            {Number(selectedProduct.currentStock || 0)}{" "}
+            <span>
+              {selectedProduct.unit || "units"}
+            </span>
+          </strong>
+        </div>
+
+        {/* ADJUSTMENT TYPE */}
+
+        <div style={styles.formSection}>
+          <label style={styles.formLabel}>
+            Stock Adjustment
+          </label>
+
+          <select
+            value={stockType}
+            onChange={(e) =>
+              setStockType(e.target.value)
+            }
+            style={styles.formInput}
+          >
+            <option value="increase">
+              Increased Stock
+            </option>
+
+            <option value="decrease">
+              Decreased Stock
+            </option>
+          </select>
+        </div>
+
+        {/* QUANTITY */}
+
+        <div style={styles.formSection}>
+          <label style={styles.formLabel}>
+            Quantity
+          </label>
+
+          <input
+            type="number"
+            min="1"
+            value={stockQuantity}
+            onChange={(e) =>
+              setStockQuantity(e.target.value)
+            }
+            placeholder="Enter quantity"
+            style={styles.formInput}
+          />
+        </div>
+
+        {/* NOTES */}
+
+        <div style={styles.formSection}>
+          <label style={styles.formLabel}>
+            Notes
+            <span style={styles.optionalLabel}>
+              Optional
+            </span>
+          </label>
+
+          <textarea
+            value={stockNotes}
+            onChange={(e) =>
+              setStockNotes(e.target.value)
+            }
+            placeholder="Reason for stock adjustment..."
+            rows={4}
+            style={styles.formTextarea}
+          />
+        </div>
+
+        {/* PREVIEW */}
+
+        {stockQuantity &&
+          Number(stockQuantity) > 0 && (
+            <div style={styles.previewCard}>
+              <div style={styles.previewTitle}>
+                Stock Preview
               </div>
 
-              {/* CURRENT STOCK */}
+              <div style={styles.previewRow}>
+                <span>Current Stock</span>
 
-              <div style={styles.currentStockBox}>
-
-                <span style={styles.currentStockLabel}>
-                  Current Stock
-                </span>
-
-                <strong style={styles.currentStockValue}>
+                <strong>
                   {Number(
                     selectedProduct.currentStock || 0
-                  )}{" "}
-                  <span>
-                    {selectedProduct.unit || "units"}
-                  </span>
+                  )}
                 </strong>
-
               </div>
 
-              {/* ADJUSTMENT FORM */}
+              <div style={styles.previewRow}>
+                <span>Adjustment</span>
 
-              <div style={styles.formSection}>
-
-                <label style={styles.formLabel}>
-                  Stock Adjustment
-                </label>
-
-                <select
-                  value={stockType}
-                  onChange={(e) =>
-                    setStockType(e.target.value)
-                  }
-                  style={styles.formInput}
-                >
-                  <option value="increase">
-                    Increased Stock
-                  </option>
-
-                  <option value="decrease">
-                    Decreased Stock
-                  </option>
-                </select>
-
-              </div>
-
-              <div style={styles.formSection}>
-
-                <label style={styles.formLabel}>
-                  Quantity
-                </label>
-
-                <input
-                  type="number"
-                  min="1"
-                  value={stockQuantity}
-                  onChange={(e) =>
-                    setStockQuantity(e.target.value)
-                  }
-                  placeholder="Enter quantity"
-                  style={styles.formInput}
-                />
-
-              </div>
-
-              <div style={styles.formSection}>
-
-                <label style={styles.formLabel}>
-                  Notes
-                  <span style={styles.optionalLabel}>
-                    Optional
-                  </span>
-                </label>
-
-                <textarea
-                  value={stockNotes}
-                  onChange={(e) =>
-                    setStockNotes(e.target.value)
-                  }
-                  placeholder="Reason for stock adjustment..."
-                  rows={4}
-                  style={styles.formTextarea}
-                />
-
-              </div>
-
-              {/* PREVIEW */}
-
-              {stockQuantity &&
-                Number(stockQuantity) > 0 && (
-                  <div style={styles.previewCard}>
-
-                    <div style={styles.previewTitle}>
-                      Stock Preview
-                    </div>
-
-                    <div style={styles.previewRow}>
-                      <span>Current Stock</span>
-                      <strong>
-                        {Number(
-                          selectedProduct.currentStock || 0
-                        )}
-                      </strong>
-                    </div>
-
-                    <div style={styles.previewRow}>
-                      <span>Adjustment</span>
-
-                      <strong
-                        style={{
-                          color:
-                            stockType === "increase"
-                              ? "#15803d"
-                              : "#b91c1c",
-                        }}
-                      >
-                        {stockType === "increase"
-                          ? "+"
-                          : "-"}
-                        {Number(stockQuantity)}
-                      </strong>
-                    </div>
-
-                    <div style={styles.previewDivider} />
-
-                    <div style={styles.previewRow}>
-                      <span>New Stock</span>
-
-                      <strong style={styles.previewNewStock}>
-                        {Math.max(
-                          0,
-                          Number(
-                            selectedProduct.currentStock || 0
-                          ) +
-                            (stockType === "increase"
-                              ? Number(stockQuantity)
-                              : -Number(stockQuantity))
-                        )}
-                      </strong>
-                    </div>
-
-                  </div>
-                )}
-
-              {/* BUTTONS */}
-
-              <div style={styles.adjustActions}>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAdjustForm(false);
-                    resetStockForm();
+                <strong
+                  style={{
+                    color:
+                      stockType === "increase"
+                        ? "#15803d"
+                        : "#b91c1c",
                   }}
-                  style={styles.cancelAdjustButton}
-                  disabled={savingStock}
                 >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSaveStockAdjustment}
-                  style={styles.saveAdjustButton}
-                  disabled={savingStock}
-                >
-                  {savingStock
-                    ? "Saving..."
-                    : "Save Adjustment"}
-                </button>
-
+                  {stockType === "increase" ? "+" : "-"}
+                  {Number(stockQuantity)}
+                </strong>
               </div>
-            </>
-          )}
 
-        </Offcanvas.Body>
+              <div style={styles.previewDivider} />
+
+              <div style={styles.previewRow}>
+                <span>New Stock</span>
+
+                <strong style={styles.previewNewStock}>
+                  {Math.max(
+                    0,
+                    Number(
+                      selectedProduct.currentStock || 0
+                    ) +
+                      (stockType === "increase"
+                        ? Number(stockQuantity)
+                        : -Number(stockQuantity))
+                  )}
+                </strong>
+              </div>
+            </div>
+          )}
+      </div>
+
+      {/* FIXED BOTTOM BUTTONS */}
+
+      <div
+        style={{
+          flexShrink: 0,
+          borderTop: "1px solid #e2e8f0",
+          backgroundColor: "#ffffff",
+          paddingTop: "12px",
+          paddingBottom: "4px",
+          display: "flex",
+          gap: "8px",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setShowAdjustForm(false);
+            resetStockForm();
+          }}
+          style={styles.cancelAdjustButton}
+          disabled={savingStock}
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          onClick={handleSaveStockAdjustment}
+          style={styles.saveAdjustButton}
+          disabled={savingStock}
+        >
+          {savingStock
+            ? "Saving..."
+            : "Save Adjustment"}
+        </button>
+      </div>
+    </div>
+  )}
+</Offcanvas.Body>
       </Offcanvas>
 
     </div>
@@ -2362,8 +2401,10 @@ const styles = {
   },
 
   offcanvasBody: {
-    padding: "16px",
+    padding: "20px",
     backgroundColor: "#ffffff",
+      overflow: "hidden",
+
   },
 
   detailProductHeader: {
