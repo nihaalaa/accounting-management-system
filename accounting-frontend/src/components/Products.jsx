@@ -1353,7 +1353,7 @@ const handleSaveStockAdjustment = async () => {
   }}
       >
         <Offcanvas.Header
-          closeButton
+           
           style={styles.offcanvasHeader}
         >
           <Offcanvas.Title style={styles.offcanvasTitle}>
@@ -1370,8 +1370,28 @@ const handleSaveStockAdjustment = async () => {
     display: "flex",
     flexDirection: "column",
     padding: "20px",
+  }} 
+>
+  <button
+  type="button"
+  onClick={handleCloseOffcanvas}
+  style={{
+    border: "none",
+    background: "none",
+    padding: "0",
+    marginBottom: "14px",
+    color: "#3b6b9d",
+    fontSize: "12px",
+    fontWeight: "600",
+    display: "flex",
+    alignItems: "center",
+    gap: "5px",
+    cursor: "pointer",
   }}
 >
+  <BsArrowLeft size={14} />
+  Back to Products
+</button>
   {/* ================= PRODUCT DETAILS ================= */}
 
   {selectedProduct && !showAdjustForm && (
