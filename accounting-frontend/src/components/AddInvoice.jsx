@@ -5,13 +5,13 @@ import axios from "axios";
 import {
   BsArrowLeft,
   BsFileEarmarkText,
-  BsPlus,
   BsTrash,
   BsCheck2,
   BsReceipt,
   BsPerson,
   BsCreditCard,
   BsCart3,
+  BsSearch,
 } from "react-icons/bs";
 
 export const AddInvoice = () => {
@@ -28,11 +28,22 @@ export const AddInvoice = () => {
   const [customerId, setCustomerId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [paymentStatus, setPaymentStatus] = useState("Paid");
+  const [dueDate, setDueDate] = useState("");
+const [amountReceivedInput, setAmountReceivedInput] = useState("");
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState("");
 
   const [selectedProduct, setSelectedProduct] = useState("");
   const [quantity, setQuantity] = useState(1);
+
+const [productSearch, setProductSearch] = useState("");
+const [showProductOptions, setShowProductOptions] = useState(false);
+
+const filteredProducts = products.filter((product) =>
+  product.name
+    .toLowerCase()
+    .includes(productSearch.toLowerCase())
+);
 
   const [items, setItems] = useState([]);
 
@@ -96,70 +107,50 @@ export const AddInvoice = () => {
      ADD PRODUCT
   ===================================================== */
 
-  const addProduct = () => {
-    if (!selectedProduct) {
-      alert("Please select a product");
-      return;
-    }
+const addProduct = (productId, productQuantity) => {
+  const product = products.find(
+    (p) => p._id === productId
+  );
 
-    if (Number(quantity) < 1) {
-      alert("Quantity must be at least 1");
-      return;
-    }
+  const qty = Number(productQuantity);
 
-    const product = products.find(
-      (p) => p._id === selectedProduct
-    );
+  if (!product || !Number.isInteger(qty) || qty < 1) {
+    return;
+  }
 
-    if (!product) return;
+  const price = Number(product.sellingPrice);
+  const tax = Number(product.tax || 0);
 
-    const existingItem = items.find(
-      (item) => item.productId === product._id
+  setItems((prevItems) => {
+    const existingItem = prevItems.find(
+      (item) => item.productId === productId
     );
 
     if (existingItem) {
-      setItems(
-        items.map((item) =>
-          item.productId === product._id
-            ? {
-                ...item,
-                quantity:
-                  item.quantity + Number(quantity),
-
-                total:
-                  (item.quantity + Number(quantity)) *
-                  item.price *
-                  (1 + item.tax / 100),
-              }
-            : item
-        )
+      return prevItems.map((item) =>
+        item.productId === productId
+          ? {
+              ...item,
+              quantity: qty,
+              total: qty * item.price * (1 + item.tax / 100),
+            }
+          : item
       );
-    } else {
-      const baseAmount =
-        Number(quantity) *
-        Number(product.sellingPrice);
-
-      const taxAmount =
-        baseAmount *
-        (Number(product.tax) / 100);
-
-      const total = baseAmount + taxAmount;
-
-      const newItem = {
-        productId: product._id,
-        productName: product.name,
-        quantity: Number(quantity),
-        price: Number(product.sellingPrice),
-        tax: Number(product.tax),
-        total,
-      };
-
-      setItems([...items, newItem]);
     }
 
-    setSelectedProduct("");
-    setQuantity(1);
-  };
+    return [
+      ...prevItems,
+      {
+        productId: product._id,
+        productName: product.name,
+        quantity: qty,
+        price,
+        tax,
+        total: qty * price * (1 + tax / 100),
+      },
+    ];
+  });
+};
 
   /* =====================================================
      REMOVE PRODUCT
@@ -199,6 +190,20 @@ export const AddInvoice = () => {
       Number(discount || 0)
   );
 
+/* PAYMENT CALCULATIONS */
+
+const amountReceived =
+  paymentStatus === "Paid"
+    ? grandTotal
+    : paymentStatus === "Unpaid"
+      ? 0
+      : Number(amountReceivedInput || 0);
+
+const balanceDue = Math.max(
+  0,
+  grandTotal - amountReceived
+);
+
   /* =====================================================
      SELECTED CUSTOMER
   ===================================================== */
@@ -213,42 +218,67 @@ export const AddInvoice = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!customerId) {
-      alert("Please select a customer");
-      return;
-    }
-
+if (!customerId) {
+  return;
+}
     if (items.length === 0) {
       alert("Please add at least one product");
       return;
     }
 
-    const customer = customers.find(
-      (c) => c._id === customerId
-    );
+if (grandTotal <= 0) {
+  alert("Invoice total must be greater than zero.");
+  return;
+}
 
-    const invoiceData = {
-      invoiceNumber,
-      date,
+if (paymentStatus !== "Paid" && !dueDate) {
+  alert("Please select a payment due date.");
+  return;
+}
 
-      customerId,
-      customerName: customer.name,
-      customerPhone: customer.phone || "",
-      customerAddress: customer.address || "",
+if (
+  paymentStatus === "Partially Paid" &&
+  (
+    !Number.isFinite(Number(amountReceivedInput)) ||
+    Number(amountReceivedInput) <= 0 ||
+    Number(amountReceivedInput) >= grandTotal
+  )
+) {
+  alert(
+    "For a partially paid invoice, the amount received must be greater than zero and less than the invoice total."
+  );
+  return;
+}
 
-      items,
+const customer = customers.find(
+  (c) => c._id === customerId
+);
 
-      subtotal,
-      taxAmount,
-      discount: Number(discount || 0),
-      grandTotal,
+if (!customer) {
+  alert("Please select a valid customer.");
+  return;
+}
 
-      paymentMethod,
-      paymentStatus,
-
-      notes,
-    };
+const invoiceData = {
+  invoiceNumber,
+  date,
+  customerId: customer._id,
+  customerName: customer.name,
+  customerPhone: customer.phone || "",
+  customerAddress: customer.address || "",
+  items,
+  subtotal,
+  taxAmount,
+  discount: Number(discount || 0),
+  grandTotal,
+  paymentMethod,
+  paymentStatus,
+    amountReceived,
+  balanceDue,
+  dueDate: paymentStatus === "Paid" ? null : dueDate,
+  
+  notes,
+};
 
     try {
       await axios.post(
@@ -269,7 +299,8 @@ export const AddInvoice = () => {
     }
   };
 
-  return (
+  return (<>
+      <style>{responsiveStyles}</style>
     <div style={pageStyle}>
       <div style={pageContainer}>
 
@@ -277,7 +308,7 @@ export const AddInvoice = () => {
             PAGE HEADER
         ================================================= */}
 
-        <div style={pageHeader}>
+        <div className="invoice-page-header" style={pageHeader}>
           <div>
 
             <div style={breadcrumb}>
@@ -328,7 +359,7 @@ export const AddInvoice = () => {
 
         <Form onSubmit={handleSubmit}>
 
-          <div style={mainLayout}>
+          <div className="invoice-main-layout" style={mainLayout}>
 
             {/* =================================================
                 LEFT COLUMN
@@ -376,14 +407,13 @@ export const AddInvoice = () => {
                 </div>
 
 
-                <div style={twoColumnRow}>
+                <div className="invoice-two-column" style={twoColumnRow}>
 
                   <Form.Group style={fieldStyle}>
 
                     <Form.Label style={labelStyle}>
                       Invoice Number
-                      <span style={required}>*</span>
-                    </Form.Label>
+                     </Form.Label>
 
                     <Form.Control
                       type="text"
@@ -406,8 +436,7 @@ export const AddInvoice = () => {
 
                     <Form.Label style={labelStyle}>
                       Invoice Date
-                      <span style={required}>*</span>
-                    </Form.Label>
+                      </Form.Label>
 
                     <Form.Control
                       type="date"
@@ -452,8 +481,7 @@ export const AddInvoice = () => {
 
                   <Form.Label style={labelStyle}>
                     Customer
-                    <span style={required}>*</span>
-                  </Form.Label>
+                   </Form.Label>
 
                   <Form.Select
                     value={customerId}
@@ -461,8 +489,7 @@ export const AddInvoice = () => {
                       setCustomerId(e.target.value)
                     }
                     style={inputStyle}
-                    required
-                  >
+                   >
 
                     <option value="">
                       Select customer
@@ -542,82 +569,269 @@ export const AddInvoice = () => {
                 </div>
 
 
-                <div style={productAddRow}>
-
-                  <Form.Group
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                    }}
-                  >
-
-                    <Form.Label style={labelStyle}>
-                      Product
-                    </Form.Label>
-
-                    <Form.Select
-                      value={selectedProduct}
-                      onChange={(e) =>
-                        setSelectedProduct(e.target.value)
-                      }
-                      style={inputStyle}
-                    >
-
-                      <option value="">
-                        Select product
-                      </option>
-
-                      {products.map((product) => (
-                        <option
-                          key={product._id}
-                          value={product._id}
-                        >
-                          {product.name} — ₹
-                          {Number(
-                            product.sellingPrice
-                          ).toFixed(2)}
-                        </option>
-                      ))}
-
-                    </Form.Select>
-
-                  </Form.Group>
+                <div className="invoice-product-row" style={productAddRow}>
 
 
-                  <Form.Group
-                    style={{
-                      width: "105px",
-                      flexShrink: 0,
-                    }}
-                  >
+{/* SEARCHABLE PRODUCT FIELD */}
+<Form.Group
+  style={{
+    flex: 1,
+    minWidth: 0,
+    position: "relative",
+  }}
+>
+  <Form.Label style={labelStyle}>
+    Product
+  </Form.Label>
 
-                    <Form.Label style={labelStyle}>
-                      Quantity
-                    </Form.Label>
+  <div style={{ position: "relative" }}>
+    <BsSearch
+      size={15}
+      style={{
+        position: "absolute",
+        left: "12px",
+        top: "50%",
+        transform: "translateY(-50%)",
+        color: "#7b8794",
+        zIndex: 1,
+        pointerEvents: "none",
+      }}
+    />
 
-                    <Form.Control
-                      type="number"
-                      min="1"
-                      value={quantity}
-                      onChange={(e) =>
-                        setQuantity(e.target.value)
-                      }
-                      style={inputStyle}
-                    />
+    <Form.Control
+      type="text"
+      placeholder="Search products by name..."
+      value={productSearch}
+      onFocus={() => setShowProductOptions(true)}
+      onChange={(e) => {
+        setProductSearch(e.target.value);
+        setSelectedProduct("");
+        setShowProductOptions(true);
+      }}
+      style={{
+        ...inputStyle,
+        paddingLeft: "36px",
+        paddingRight: "12px",
+        height: "42px",
+      }}
+    />
+  </div>
 
-                  </Form.Group>
+  {showProductOptions && (
+    <>
 
+{/* Close dropdown when clicking outside */}
+<div
+  onClick={() => setShowProductOptions(false)}
+  style={{
+    position: "fixed",
+    inset: 0,
+    zIndex: 10,
+  }}
+/>
 
-                  <Button
-                    type="button"
-                    onClick={addProduct}
-                    style={addProductButton}
-                  >
-                    <BsPlus size={16} />
-                    Add Product
-                  </Button>
+      <div
+        style={{
+          position: "absolute",
+          top: "100%",
+          left: 0,
+          right: 0,
+          marginTop: "5px",
+          background: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "10px",
+          boxShadow: "0 8px 24px rgba(15, 27, 45, 0.12)",
+          maxHeight: "240px",
+          overflowY: "auto",
+          zIndex: 11,
+        }}
+      >
+        {filteredProducts.length > 0 ? (
+          filteredProducts.map((product) => (
+            <div
+              key={product._id}
+              onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          setSelectedProduct(product._id);
+          setProductSearch(product.name);
+          setQuantity(1);
+          setShowProductOptions(false);
 
-                </div>
+          addProduct(product._id, 1);
+        }}
+              style={{
+                padding: "10px 12px",
+                cursor: "pointer",
+                borderBottom: "1px solid #f1f3f6",
+                background:
+                  selectedProduct === product._id
+                    ? "#eef4fb"
+                    : "#ffffff",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "#263548",
+                }}
+              >
+                {product.name}
+              </div>
+
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#64748b",
+                  marginTop: "3px",
+                }}
+              >
+                Selling price: ₹
+                {Number(product.sellingPrice).toFixed(2)}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div
+            style={{
+              padding: "16px 12px",
+              textAlign: "center",
+              fontSize: "13px",
+              color: "#64748b",
+            }}
+          >
+            No matching products found
+          </div>
+        )}
+      </div>
+    </>
+  )}
+</Form.Group>
+
+{/* QUANTITY STEPPER */}
+<Form.Group
+  style={{
+    width: "145px",
+    flexShrink: 0,
+  }}
+>
+  <Form.Label style={labelStyle}>
+    Quantity
+  </Form.Label>
+
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      height: "42px",
+      border: "1px solid #d7dee8",
+      borderRadius: "8px",
+      overflow: "hidden",
+      background: "#ffffff",
+    }}
+  >
+    <button
+      type="button"
+onClick={() => {
+  if (!selectedProduct) return;
+
+  const nextQuantity = Math.max(
+    1,
+    Number(quantity || 1) - 1
+  );
+
+  setQuantity(nextQuantity);
+  addProduct(selectedProduct, nextQuantity);
+}}
+      disabled={Number(quantity) <= 1}
+      style={{
+        width: "38px",
+        height: "100%",
+        border: "none",
+        background: "#f5f7fa",
+        color: Number(quantity) <= 1 ? "#b8c0cc" : "#344256",
+        fontSize: "20px",
+        cursor: Number(quantity) <= 1 ? "not-allowed" : "pointer",
+      }}
+      aria-label="Decrease quantity"
+    >
+      −
+    </button>
+
+    <Form.Control
+      type="number"
+      min="1"
+      step="1"
+      value={quantity}
+
+onChange={(e) => {
+  const value = e.target.value;
+  setQuantity(value);
+
+  if (
+    selectedProduct &&
+    value !== "" &&
+    Number.isInteger(Number(value)) &&
+    Number(value) >= 1
+  ) {
+    addProduct(selectedProduct, Number(value));
+  }
+}}
+
+onBlur={() => {
+  if (!quantity || Number(quantity) < 1) {
+    setQuantity(1);
+
+    if (selectedProduct) {
+      addProduct(selectedProduct, 1);
+    }
+  }
+}}
+
+      style={{
+        border: "none",
+        borderRadius: 0,
+        boxShadow: "none",
+        textAlign: "center",
+        padding: "0 2px",
+        minWidth: 0,
+        height: "100%",
+        fontSize: "14px",
+        fontWeight: 600,
+      }}
+      aria-label="Product quantity"
+    />
+
+    <button
+
+onClick={() => {
+  if (!selectedProduct) {
+    alert("Please select a product first.");
+    return;
+  }
+
+  const nextQuantity = Number(quantity || 1) + 1;
+
+  setQuantity(nextQuantity);
+  addProduct(selectedProduct, nextQuantity);
+}}
+
+      style={{
+        width: "38px",
+        height: "100%",
+        border: "none",
+        background: "#f5f7fa",
+        color: "#344256",
+        fontSize: "20px",
+        cursor: "pointer",
+      }}
+      aria-label="Increase quantity"
+    >
+      +
+    </button>
+  </div>
+</Form.Group>
+                 </div>
 
 
                 {/* =================================================
@@ -825,7 +1039,7 @@ export const AddInvoice = () => {
                 </div>
 
 
-                <div style={twoColumnRow}>
+                <div className="invoice-two-column" style={twoColumnRow}>
 
                   <Form.Group style={fieldStyle}>
 
@@ -872,33 +1086,108 @@ export const AddInvoice = () => {
                       <span style={required}>*</span>
                     </Form.Label>
 
-                    <Form.Select
-                      value={paymentStatus}
-                      onChange={(e) =>
-                        setPaymentStatus(
-                          e.target.value
-                        )
-                      }
-                      style={inputStyle}
-                    >
+                <Form.Select
+                  value={paymentStatus}
+                  onChange={(e) => {
+                    const status = e.target.value;
+                    setPaymentStatus(status);
 
-                      <option value="Paid">
-                        Paid
-                      </option>
-
-                      <option value="Pending">
-                        Pending
-                      </option>
-
-                      <option value="Partially Paid">
-                        Partially Paid
-                      </option>
-
-                    </Form.Select>
+                    if (status !== "Partially Paid") {
+                      setAmountReceivedInput("");
+                    }
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="Paid">Paid</option>
+                  <option value="Unpaid">Unpaid</option>
+                  <option value="Partially Paid">Partially Paid</option>
+                </Form.Select>
 
                   </Form.Group>
 
                 </div>
+
+{/* DUE DATE */}
+
+{paymentStatus !== "Paid" && (
+  <div
+    className="invoice-two-column"
+    style={{
+      ...twoColumnRow,
+      marginTop: "4px",
+      marginBottom: "19px",
+    }}
+  >
+    <Form.Group style={fieldStyle}>
+      <Form.Label style={labelStyle}>
+        Payment Due Date
+        <span style={required}>*</span>
+      </Form.Label>
+
+      <Form.Control
+        type="date"
+        value={dueDate}
+        min={date}
+        onChange={(e) => setDueDate(e.target.value)}
+        style={inputStyle}
+        required
+      />
+
+      <div style={helpText}>
+        Set the date by which the pending payment
+        should be collected.
+      </div>
+    </Form.Group>
+
+    {/* AMOUNT RECEIVED */}
+
+    {paymentStatus === "Partially Paid" ? (
+      <Form.Group style={fieldStyle}>
+        <Form.Label style={labelStyle}>
+          Amount Received (₹)
+          <span style={required}>*</span>
+        </Form.Label>
+
+        <Form.Control
+          type="number"
+          // min="0.01"
+          max={grandTotal}
+          value={amountReceivedInput}
+          onChange={(e) =>
+            setAmountReceivedInput(e.target.value)
+          }
+          placeholder="Enter amount received"
+          style={inputStyle}
+          required
+        />
+
+        <div style={helpText}>
+          Enter the amount already paid by the customer.
+        </div>
+      </Form.Group>
+    ) : (
+      <Form.Group style={fieldStyle}>
+        {/* <Form.Label style={labelStyle}>
+          Amount Received
+        </Form.Label>
+
+        <Form.Control
+          type="text"
+          value="₹0.00"
+          readOnly
+          style={{
+            ...inputStyle,
+            backgroundColor: "#f8fafb",
+          }}
+        /> */}
+
+        <div style={helpText}>
+          No payment has been received yet.
+        </div>
+      </Form.Group>
+    )}
+  </div>
+)}
 
 
                 {/* =================================================
@@ -935,7 +1224,7 @@ export const AddInvoice = () => {
                   FORM FOOTER
               ================================================= */}
 
-              <div style={formFooter}>
+              <div className="invoice-footer" style={formFooter}>
 
                 <div>
                   <div style={footerTitle}>
@@ -948,7 +1237,7 @@ export const AddInvoice = () => {
                 </div>
 
 
-                <div style={footerActions}>
+                <div className="invoice-footer-actions" style={footerActions}>
 
                   <Button
                     type="button"
@@ -1295,6 +1584,109 @@ export const AddInvoice = () => {
 
               </Card>
 
+{/* PAYMENT SUMMARY */}
+
+<Card style={sideCard}>
+  <div style={sideCardHeader}>
+    <div style={sideHeaderIcon}>
+      <BsCreditCard size={15} />
+    </div>
+
+    <div>
+      <h3 style={sideTitle}>Payment Summary</h3>
+      <p style={sideSubtitle}>
+        Track the amount collected and outstanding.
+      </p>
+    </div>
+  </div>
+
+  <div style={amountBody}>
+    <div style={amountRow}>
+      <span>Invoice Total</span>
+      <strong>₹{grandTotal.toFixed(2)}</strong>
+    </div>
+
+    <div style={amountRow}>
+      <span>Amount Received</span>
+      <strong style={{ color: "#287a45" }}>
+        ₹{amountReceived.toFixed(2)}
+      </strong>
+    </div>
+
+    <div style={amountDivider} />
+
+    <div style={grandTotalRow}>
+      <span>Balance Due</span>
+      <strong
+        style={{
+          color: balanceDue > 0 ? "#c2410c" : "#287a45",
+        }}
+      >
+        ₹{balanceDue.toFixed(2)}
+      </strong>
+    </div>
+
+    {paymentStatus !== "Paid" && dueDate && (
+      <div
+        style={{
+          marginTop: "15px",
+          padding: "12px",
+          border: "1px solid #f0dfb3",
+          borderRadius: "7px",
+          backgroundColor: "#fff9e9",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "7px",
+            marginBottom: "7px",
+            color: "#946516",
+            fontSize: "11px",
+            fontWeight: "700",
+          }}
+        >
+          <span>⚠</span>
+          Payment Reminder
+        </div>
+
+        <div
+          style={{
+            color: "#805d22",
+            fontSize: "11px",
+            lineHeight: 1.6,
+          }}
+        >
+          {paymentStatus === "Partially Paid"
+            ? `Collect the pending amount of ₹${balanceDue.toFixed(2)} from the customer before the due date.`
+            : `Collect the outstanding amount of ₹${balanceDue.toFixed(2)} before the due date.`}
+        </div>
+
+        <div
+          style={{
+            marginTop: "8px",
+            paddingTop: "8px",
+            borderTop: "1px solid #f0dfb3",
+            color: "#805d22",
+            fontSize: "11px",
+            fontWeight: "600",
+          }}
+        >
+          Due date:{" "}
+          {new Date(
+            `${dueDate}T00:00:00`
+          ).toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })}
+        </div>
+      </div>
+    )}
+  </div>
+</Card>
+
             </div>
 
           </div>
@@ -1303,6 +1695,7 @@ export const AddInvoice = () => {
 
       </div>
     </div>
+    </>
   );
 };
 
@@ -1531,14 +1924,15 @@ const inputStyle = {
 };
 
 const textareaStyle = {
-  minHeight: "92px",
+  minHeight: "95px",
   borderRadius: "6px",
   border: "1px solid #d6dce2",
   backgroundColor: "#ffffff",
   color: "#374151",
-  fontSize: "12px",
+  fontSize: "10px",
   resize: "vertical",
   boxShadow: "none",
+  width: "100%"
 };
 
 const helpText = {
@@ -1603,24 +1997,6 @@ const productAddRow = {
   gap: "12px",
   marginBottom: "17px",
 };
-
-const addProductButton = {
-  height: "38px",
-  padding: "0 13px",
-  borderRadius: "6px",
-  border: "1px solid #4b6985",
-  backgroundColor: "#4b6985",
-  color: "#ffffff",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "6px",
-  fontSize: "11px",
-  fontWeight: "600",
-  whiteSpace: "nowrap",
-  boxShadow: "0 2px 5px rgba(75,105,133,0.18)",
-};
-
 const itemsTableWrapper = {
   border: "1px solid #e1e6eb",
   borderRadius: "7px",
@@ -2040,7 +2416,5 @@ const responsiveStyles = `
     }
   }
 `;
-
-const OriginalPage = pageStyle;
 
 export default AddInvoice;

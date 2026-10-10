@@ -481,27 +481,44 @@ const InvoicePDF = ({ invoice }) => {
     "";
 
 
+
   /* =======================================================
      PAYMENT DATA
   ======================================================= */
 
-  const paymentStatus =
-    String(invoice.paymentStatus || "Pending");
+  const paymentStatus = String(invoice.paymentStatus || "Unpaid");
+  const paymentStatusLower = paymentStatus.toLowerCase();
+  const grandTotal = Number(invoice.grandTotal || 0);
 
-  const paymentStatusLower =
-    paymentStatus.toLowerCase();
+  const amountReceived =
+    invoice.amountReceived != null
+      ? Number(invoice.amountReceived)
+      : paymentStatusLower === "paid"
+        ? grandTotal
+        : 0;
 
+  const balanceDue =
+    invoice.balanceDue != null
+      ? Number(invoice.balanceDue)
+      : Math.max(0, grandTotal - amountReceived);
+
+  const dueDate = invoice.dueDate;
 
   let statusStyle = pdfStyles.statusDefault;
 
   if (paymentStatusLower === "paid") {
     statusStyle = pdfStyles.statusPaid;
-  } else if (paymentStatusLower === "pending") {
-    statusStyle = pdfStyles.statusPending;
-  } else if (paymentStatusLower === "partial") {
+  } else if (
+    paymentStatusLower === "partial" ||
+    paymentStatusLower === "partially paid"
+  ) {
     statusStyle = pdfStyles.statusPartial;
+  } else if (
+    paymentStatusLower === "pending" ||
+    paymentStatusLower === "unpaid"
+  ) {
+    statusStyle = pdfStyles.statusPending;
   }
-
 
   /* =======================================================
      ITEMS
@@ -629,31 +646,59 @@ const InvoicePDF = ({ invoice }) => {
           </View>
 
 
-          {/* PAYMENT */}
-          <View style={pdfStyles.informationBox}>
+  {/* PAYMENT */}
+  <View style={pdfStyles.informationBox}>
+    <Text style={pdfStyles.informationTitle}>
+      Payment Details
+    </Text>
 
-            <Text style={pdfStyles.informationTitle}>
-              Payment Information
-            </Text>
+    <Text style={pdfStyles.informationLabel}>
+      Payment Method
+    </Text>
+    <Text style={pdfStyles.informationMain}>
+      {invoice.paymentMethod || "Not specified"}
+    </Text>
 
-            <Text style={pdfStyles.informationLabel}>
-              Payment Method
-            </Text>
+    <Text style={pdfStyles.informationLabel}>
+      Payment Status
+    </Text>
+    <Text style={statusStyle}>
+      {paymentStatus}
+    </Text>
 
-            <Text style={pdfStyles.informationMain}>
-              {invoice.paymentMethod ||
-                "Not specified"}
-            </Text>
+    <Text style={pdfStyles.informationLabel}>
+      Invoice Total
+    </Text>
+    <Text style={pdfStyles.informationMain}>
+      {formatCurrency(grandTotal)}
+    </Text>
 
-            <Text style={pdfStyles.informationLabel}>
-              Payment Status
-            </Text>
+    <Text style={pdfStyles.informationLabel}>
+      Amount Received
+    </Text>
+    <Text style={pdfStyles.informationMain}>
+      {formatCurrency(amountReceived)}
+    </Text>
 
-            <Text style={statusStyle}>
-              {paymentStatus}
-            </Text>
+    <Text style={pdfStyles.informationLabel}>
+      Balance Due
+    </Text>
+    <Text style={pdfStyles.informationMain}>
+      {formatCurrency(balanceDue)}
+    </Text>
 
-          </View>
+    {dueDate && (
+      <>
+        <Text style={pdfStyles.informationLabel}>
+          Payment Due Date
+        </Text>
+        <Text style={pdfStyles.informationMain}>
+          {formatDate(dueDate)}
+        </Text>
+      </>
+    )}
+  </View>
+
 
         </View>
 
@@ -884,8 +929,7 @@ const InvoicePDF = ({ invoice }) => {
               </Text>
 
               <Text style={pdfStyles.totalValue}>
-                {formatCurrency(invoice.tax)}
-              </Text>
+formatCurrency(invoice.taxAmount ?? invoice.tax ?? 0)              </Text>
 
             </View>
 
@@ -1061,8 +1105,10 @@ export const ViewInvoice = () => {
 
     }
 
-
-    if (value === "partial") {
+if (
+  value === "partial" ||
+  value === "partially paid"
+) {
 
       return {
         backgroundColor: "#edf3f7",
@@ -1073,8 +1119,10 @@ export const ViewInvoice = () => {
     }
 
 
-    if (value === "pending") {
-
+if (
+  value === "pending" ||
+  value === "unpaid"
+) {
       return {
         backgroundColor: "#fff6df",
         color: "#9a6b16",
@@ -1237,13 +1285,27 @@ export const ViewInvoice = () => {
   ======================================================= */
 
   const paymentStatus =
-    invoice.paymentStatus ||
-    "Pending";
+    invoice.paymentStatus || "Unpaid";
 
+  const grandTotal =
+    Number(invoice.grandTotal || 0);
+
+  const amountReceived =
+    invoice.amountReceived != null
+      ? Number(invoice.amountReceived)
+      : paymentStatus.toLowerCase() === "paid"
+        ? grandTotal
+        : 0;
+
+  const balanceDue =
+    invoice.balanceDue != null
+      ? Number(invoice.balanceDue)
+      : Math.max(0, grandTotal - amountReceived);
+
+  const dueDate = invoice.dueDate;
 
   const paymentBadgeStyle =
     getPaymentBadge(paymentStatus);
-
 
   /* =======================================================
      PAGE STYLES
@@ -1973,85 +2035,126 @@ export const ViewInvoice = () => {
                 </Col>
 
 
-                {/* PAYMENT */}
 
-                <Col md={6}>
+{/* PAYMENT */}
 
-                  <div style={sectionLabelStyle}>
-                    Payment Information
-                  </div>
+<Col md={6}>
+  <div style={sectionLabelStyle}>
+    Payment Information
+  </div>
 
+  <div style={infoBoxStyle}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "11px",
+      }}
+    >
+      <div style={infoIconStyle}>
+        <BsCreditCard size={16} />
+      </div>
 
-                  <div style={infoBoxStyle}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Payment method */}
+        <p style={infoMainTextStyle}>
+          {invoice.paymentMethod || "Not specified"}
+        </p>
 
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems:
-                          "flex-start",
-                        gap: "11px",
-                      }}
-                    >
+        {/* Payment status */}
+        <div
+          style={{
+            marginTop: "6px",
+            marginBottom: "14px",
+            display: "flex",
+            alignItems: "center",
+            gap: "7px",
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "10px",
+              color: "#8a94a3",
+              textTransform: "uppercase",
+              fontWeight: "650",
+              letterSpacing: "0.35px",
+            }}
+          >
+            Payment Status
+          </span>
 
-                      <div style={infoIconStyle}>
-                        <BsCreditCard size={16} />
-                      </div>
+          <Badge
+            style={{
+              ...paymentBadgeStyle,
+              borderRadius: "4px",
+              padding: "4px 7px",
+              fontSize: "9px",
+              fontWeight: "650",
+            }}
+          >
+            {paymentStatus}
+          </Badge>
+        </div>
 
+        {/* Payment amounts and due date */}
+        {[
+          {
+            label: "Invoice Total",
+            value: formatCurrency(grandTotal),
+          },
+          {
+            label: "Amount Received",
+            value: formatCurrency(amountReceived),
+          },
+          {
+            label: "Balance Due",
+            value: formatCurrency(balanceDue),
+            highlight: balanceDue > 0,
+          },
+          {
+            label: "Payment Due Date",
+            value: dueDate ? formatDate(dueDate) : "-",
+          },
+        ].map((item) => (
+          <div
+            key={item.label}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "12px",
+              padding: "8px 0",
+              borderTop: "1px solid #edf0f2",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "11px",
+                color: "#737d89",
+              }}
+            >
+              {item.label}
+            </span>
 
-                      <div>
-
-                        <p style={infoMainTextStyle}>
-                          {invoice.paymentMethod ||
-                            "Not specified"}
-                        </p>
-
-
-                        <div
-                          style={{
-                            marginTop: "6px",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "7px",
-                          }}
-                        >
-
-                          <span
-                            style={{
-                              fontSize: "10px",
-                              color: "#8a94a3",
-                              textTransform:
-                                "uppercase",
-                              fontWeight: "650",
-                              letterSpacing:
-                                "0.35px",
-                            }}
-                          >
-                            Payment Status
-                          </span>
-
-
-                          <Badge
-                            style={{
-                              ...paymentBadgeStyle,
-                              borderRadius: "4px",
-                              padding: "4px 7px",
-                              fontSize: "9px",
-                              fontWeight: "650",
-                            }}
-                          >
-                            {paymentStatus}
-                          </Badge>
-
-                        </div>
-
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                </Col>
-
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: "650",
+                color: item.highlight
+                  ? "#9a6b16"
+                  : "#303844",
+                textAlign: "right",
+              }}
+            >
+              {item.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</Col>
               </Row>
 
 

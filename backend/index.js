@@ -494,24 +494,40 @@ app.delete("/customers/:id", async (req, res) => {
 
 // ================= INVOICES =================
 
+function cleanInvoiceData(data) {
+  const cleaned = { ...data };
+
+  if (cleaned.customerId === "") {
+    cleaned.customerId = null;
+  }
+
+  if (cleaned.dueDate === "") {
+    cleaned.dueDate = null;
+  }
+
+  return cleaned;
+}
+
 // ADD INVOICE
+
 app.post("/invoices", async (req, res) => {
   try {
-    const invoice = new Invoice(req.body);
-
+    const invoice = new Invoice(cleanInvoiceData(req.body));
     const savedInvoice = await invoice.save();
 
-    res.status(201).json(savedInvoice);
+    return res.status(201).json({
+      message: "Invoice saved successfully",
+      invoice: savedInvoice,
+    });
   } catch (error) {
-    console.log("Invoice error:", error);
+    console.error("Save invoice error:", error);
 
-    res.status(500).json({
-      message: "Failed to add invoice",
+    return res.status(400).json({
+      message: "Failed to save invoice",
       error: error.message,
     });
   }
 });
-
 
 // GET ALL INVOICES
 app.get("/invoices", async (req, res) => {
@@ -551,32 +567,34 @@ app.get("/invoices/:id", async (req, res) => {
 
 
 // UPDATE INVOICE
+
 app.put("/invoices/:id", async (req, res) => {
   try {
-    const updatedInvoice = await Invoice.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const invoice = await Invoice.findById(req.params.id);
 
-    if (!updatedInvoice) {
+    if (!invoice) {
       return res.status(404).json({
         message: "Invoice not found",
       });
     }
 
-    res.status(200).json(updatedInvoice);
+    // Update the invoice with the submitted fields
+Object.assign(invoice, cleanInvoiceData(req.body));
+    const updatedInvoice = await invoice.save();
+
+    return res.status(200).json({
+      message: "Invoice updated successfully",
+      invoice: updatedInvoice,
+    });
   } catch (error) {
-    res.status(500).json({
+    console.error("Update invoice error:", error);
+
+    return res.status(400).json({
       message: "Failed to update invoice",
       error: error.message,
     });
   }
 });
-
 
 // DELETE INVOICE
 app.delete("/invoices/:id", async (req, res) => {

@@ -55,12 +55,12 @@ const invoiceSchema = new mongoose.Schema(
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer",
-      required: true,
+        default: null,
     },
 
     customerName: {
       type: String,
-      required: true,
+        default: "Walk-in Customer",
     },
 
     customerPhone: {
@@ -106,9 +106,26 @@ const invoiceSchema = new mongoose.Schema(
 
     paymentStatus: {
       type: String,
-      enum: ["Paid", "Pending", "Partially Paid"],
+      enum: ["Paid", "Unpaid", "Partially Paid"],
       default: "Paid",
     },
+
+amountReceived: {
+  type: Number,
+  default: 0,
+  min: 0,
+},
+
+balanceDue: {
+  type: Number,
+  default: 0,
+  min: 0,
+},
+
+dueDate: {
+  type: Date,
+  default: null,
+},
 
     notes: {
       type: String,

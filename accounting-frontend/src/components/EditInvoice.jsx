@@ -4,7 +4,6 @@ import { Button, Card, Form, Table } from "react-bootstrap";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   BsArrowLeft,
-  BsPlus,
   BsTrash,
   BsCheck2,
   BsReceipt,
@@ -13,6 +12,7 @@ import {
   BsCreditCard,
   BsCalendar3,
   BsFileEarmarkText,
+  BsSearch,
 } from "react-icons/bs";
 
 export const EditInvoice = () => {
@@ -34,11 +34,14 @@ export const EditInvoice = () => {
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [paymentStatus, setPaymentStatus] = useState("Paid");
+  const [dueDate, setDueDate] = useState("");
+const [amountReceivedInput, setAmountReceivedInput] = useState("0");
   const [notes, setNotes] = useState("");
 
   const [selectedProduct, setSelectedProduct] = useState("");
   const [quantity, setQuantity] = useState(1);
-
+const [productSearch, setProductSearch] = useState("");
+const [showProductOptions, setShowProductOptions] = useState(false);
   // =====================================================
   // FETCH DATA
   // =====================================================
@@ -85,9 +88,20 @@ export const EditInvoice = () => {
         );
 
         setDiscount(Number(invoice.discount) || 0);
-        setPaymentMethod(invoice.paymentMethod || "Cash");
-        setPaymentStatus(invoice.paymentStatus || "Paid");
-        setNotes(invoice.notes || "");
+setPaymentMethod(invoice.paymentMethod || "Cash");
+setPaymentStatus(invoice.paymentStatus || "Paid");
+
+setDueDate(
+  invoice.dueDate
+    ? String(invoice.dueDate).slice(0, 10)
+    : ""
+);
+
+setAmountReceivedInput(
+  String(invoice.amountReceived ?? 0)
+);
+
+setNotes(invoice.notes || "");
       } catch (error) {
         console.error("Error loading invoice:", error);
 
@@ -120,75 +134,66 @@ export const EditInvoice = () => {
   const selectedProductData = products.find(
     (product) => product._id === selectedProduct
   );
-
+const filteredProducts = products.filter((product) =>
+  (product.name || "")
+    .toLowerCase()
+    .includes(productSearch.toLowerCase())
+);
   // =====================================================
-  // ADD PRODUCT
+  // UPDATE PRODUCT IN INVOICE
   // =====================================================
 
-  const handleAddProduct = () => {
-    if (!selectedProduct) {
-      alert("Please select a product");
-      return;
-    }
-
-    if (Number(quantity) < 1) {
-      alert("Quantity must be at least 1");
-      return;
-    }
-
+  const updateProductQuantity = (productId, productQuantity) => {
     const product = products.find(
-      (item) => item._id === selectedProduct
+      (item) => item._id === productId
     );
 
-    if (!product) return;
+    const qty = Number(productQuantity);
 
-    const existingIndex = items.findIndex(
-      (item) => item.productId === product._id
-    );
+    if (
+      !product ||
+      !Number.isInteger(qty) ||
+      qty < 1
+    ) {
+      return;
+    }
 
     const price = Number(product.sellingPrice) || 0;
     const tax = Number(product.tax) || 0;
+    const total = qty * price * (1 + tax / 100);
 
-    if (existingIndex !== -1) {
-      const updatedItems = [...items];
+    setItems((prevItems) => {
+      const existingItem = prevItems.find(
+        (item) => item.productId === productId
+      );
 
-      const newQuantity =
-        Number(updatedItems[existingIndex].quantity) +
-        Number(quantity);
+      if (existingItem) {
+        return prevItems.map((item) =>
+          item.productId === productId
+            ? {
+                ...item,
+                productName: product.name,
+                quantity: qty,
+                price,
+                tax,
+                total,
+              }
+            : item
+        );
+      }
 
-      const baseTotal = newQuantity * price;
-      const taxAmount = (baseTotal * tax) / 100;
-
-      updatedItems[existingIndex] = {
-        ...updatedItems[existingIndex],
-        quantity: newQuantity,
-        price,
-        tax,
-        total: baseTotal + taxAmount,
-      };
-
-      setItems(updatedItems);
-    } else {
-      const qty = Number(quantity);
-
-      const baseTotal = qty * price;
-      const taxAmount = (baseTotal * tax) / 100;
-
-      setItems([
-        ...items,
+      return [
+        ...prevItems,
         {
           productId: product._id,
           productName: product.name,
           quantity: qty,
           price,
           tax,
-          total: baseTotal + taxAmount,
+          total,
         },
-      ]);
-    }
-
-    setSelectedProduct("");
-    setQuantity(1);
+      ];
+    });
   };
 
   // =====================================================
@@ -204,30 +209,34 @@ export const EditInvoice = () => {
   // =====================================================
   // CHANGE QUANTITY
   // =====================================================
+const handleQuantityChange = (index, newQuantity) => {
+  if (newQuantity === "") {
+    return;
+  }
 
-  const handleQuantityChange = (index, newQuantity) => {
-    const qty = Number(newQuantity);
+  const qty = Number(newQuantity);
 
-    if (qty < 1 || Number.isNaN(qty)) return;
+  if (!Number.isInteger(qty) || qty < 1) {
+    return;
+  }
 
-    const updatedItems = [...items];
-    const item = updatedItems[index];
+  setItems((prevItems) =>
+    prevItems.map((item, itemIndex) => {
+      if (itemIndex !== index) {
+        return item;
+      }
 
-    const baseTotal =
-      qty * Number(item.price || 0);
+      const baseTotal = qty * Number(item.price || 0);
+      const tax = Number(item.tax || 0);
 
-    const taxAmount =
-      (baseTotal * Number(item.tax || 0)) / 100;
-
-    updatedItems[index] = {
-      ...item,
-      quantity: qty,
-      total: baseTotal + taxAmount,
-    };
-
-    setItems(updatedItems);
-  };
-
+      return {
+        ...item,
+        quantity: qty,
+        total: baseTotal + (baseTotal * tax) / 100,
+      };
+    })
+  );
+};
   // =====================================================
   // CALCULATIONS
   // =====================================================
@@ -257,7 +266,17 @@ export const EditInvoice = () => {
       taxAmount -
       Number(discount || 0)
   );
+const amountReceived =
+  paymentStatus === "Paid"
+    ? grandTotal
+    : paymentStatus === "Unpaid"
+      ? 0
+      : Number(amountReceivedInput || 0);
 
+const balanceDue = Math.max(
+  0,
+  grandTotal - amountReceived
+);
   // =====================================================
   // STATUS STYLE
   // =====================================================
@@ -270,12 +289,19 @@ export const EditInvoice = () => {
       };
     }
 
-    if (status === "Pending") {
-      return {
-        color: "#b45309",
-        backgroundColor: "#fffbeb",
-      };
-    }
+if (status === "Unpaid") {
+  return {
+    color: "#b45309",
+    backgroundColor: "#fffbeb",
+  };
+}
+
+if (status === "Partially Paid") {
+  return {
+    color: "#6d28d9",
+    backgroundColor: "#f5f3ff",
+  };
+}
 
     return {
       color: "#6d28d9",
@@ -311,7 +337,32 @@ export const EditInvoice = () => {
       );
       return;
     }
+if (paymentStatus !== "Paid" && !dueDate) {
+  alert("Please select a due date.");
+  return;
+}
 
+if (
+  paymentStatus === "Partially Paid" &&
+  (
+    !Number.isFinite(amountReceived) ||
+    amountReceived <= 0 ||
+    amountReceived >= grandTotal
+  )
+) {
+  alert(
+    "Amount received must be greater than zero and less than the invoice total."
+  );
+  return;
+}
+if (
+  paymentStatus !== "Paid" &&
+  dueDate &&
+  !Number.isFinite(new Date(`${dueDate}T00:00:00`).getTime())
+) {
+  alert("Please select a valid due date.");
+  return;
+}
     try {
       setSaving(true);
 
@@ -332,9 +383,12 @@ export const EditInvoice = () => {
         discount: Number(discount || 0),
         grandTotal: Number(grandTotal.toFixed(2)),
 
-        paymentMethod,
-        paymentStatus,
-        notes,
+      paymentMethod,
+      paymentStatus,
+      amountReceived: Number(amountReceived.toFixed(2)),
+      balanceDue: Number(balanceDue.toFixed(2)),
+      dueDate: paymentStatus === "Paid" ? null : dueDate,
+      notes,
       };
 
       await axios.put(
@@ -345,19 +399,22 @@ export const EditInvoice = () => {
       alert("Invoice updated successfully");
 
       navigate("/invoices");
-    } catch (error) {
-      console.error(
-        "Error updating invoice:",
-        error
-      );
+    
+} catch (error) {
+  console.error(
+    "Error updating invoice:",
+    error.response?.data || error.message
+  );
 
-      alert(
-        error.response?.data?.message ||
-          "Failed to update invoice"
-      );
-    } finally {
-      setSaving(false);
-    }
+  alert(
+    error.response?.data?.error ||
+    error.response?.data?.message ||
+    "Failed to update invoice"
+  );
+} finally {
+  setSaving(false);
+}
+
   };
 
   // =====================================================
@@ -527,60 +584,7 @@ export const EditInvoice = () => {
             {/* CUSTOMER */}
 
             <Card style={cardStyle}>
-
-              <div style={sectionHeader}>
-                <div style={sectionIcon}>
-                  <BsPerson size={17} />
-                </div>
-
-                <div>
-                  <div style={sectionTitle}>
-                    Customer
-                  </div>
-
-                  <div style={sectionSubtitle}>
-                    Select the customer for this invoice.
-                  </div>
-                </div>
-              </div>
-
               <Card.Body style={cardBody}>
-
-                <Form.Group>
-
-                  <Form.Label style={labelStyle}>
-                    Customer
-                    <span style={required}>*</span>
-                  </Form.Label>
-
-                  <Form.Select
-                    value={customerId}
-                    onChange={(e) =>
-                      setCustomerId(e.target.value)
-                    }
-                    required
-                    style={inputStyle}
-                  >
-                    <option value="">
-                      Select customer
-                    </option>
-
-                    {customers.map((customer) => (
-                      <option
-                        key={customer._id}
-                        value={customer._id}
-                      >
-                        {customer.name}
-                        {customer.phone
-                          ? ` — ${customer.phone}`
-                          : ""}
-                      </option>
-                    ))}
-                  </Form.Select>
-
-                </Form.Group>
-
-
                 {selectedCustomer && (
                   <div style={customerPreview}>
 
@@ -660,127 +664,341 @@ export const EditInvoice = () => {
 
               <Card.Body style={cardBody}>
 
-                {/* ADD PRODUCT */}
 
-                <div style={addProductBox}>
+{/* SEARCHABLE PRODUCT + QUANTITY */}
 
-                  <div style={addProductTitle}>
-                    Add Product
+<div style={addProductBox}>
+  <div style={addProductTitle}>
+    Add Product
+  </div>
+
+  <div style={productAddRow}>
+
+    {/* SEARCHABLE PRODUCT FIELD */}
+    <Form.Group
+      style={{
+        flex: 1,
+        minWidth: 0,
+        position: "relative",
+      }}
+    >
+      <Form.Label style={labelStyle}>
+        Product
+      </Form.Label>
+
+      <div style={{ position: "relative" }}>
+        <BsSearch
+          size={15}
+          style={{
+            position: "absolute",
+            left: "12px",
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "#7b8794",
+            zIndex: 1,
+            pointerEvents: "none",
+          }}
+        />
+
+        <Form.Control
+          type="text"
+          placeholder="Search products by name..."
+          value={productSearch}
+          onFocus={() => setShowProductOptions(true)}
+          onChange={(e) => {
+            setProductSearch(e.target.value);
+            setSelectedProduct("");
+            setQuantity(1);
+            setShowProductOptions(true);
+          }}
+          style={{
+            ...inputStyle,
+            paddingLeft: "36px",
+            paddingRight: "12px",
+            height: "42px",
+          }}
+        />
+      </div>
+
+      {showProductOptions && (
+        <>
+          {/* Close dropdown when clicking outside */}
+
+{/* Close dropdown when clicking outside */}
+<div
+  onClick={() => setShowProductOptions(false)}
+  style={{
+    position: "fixed",
+    inset: 0,
+    zIndex: 10,
+  }}
+/>
+
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              marginTop: "5px",
+              background: "#ffffff",
+              border: "1px solid #e2e8f0",
+              borderRadius: "8px",
+              boxShadow:
+                "0 8px 24px rgba(15, 27, 45, 0.12)",
+              maxHeight: "240px",
+              overflowY: "auto",
+              zIndex: 11,
+            }}
+          >
+            {filteredProducts.length > 0 ? (
+              filteredProducts.map((product) => (
+                <div
+                  key={product._id}
+                  onMouseDown={(e) => e.preventDefault()}
+onClick={() => {
+  const existingItem = items.find(
+    (item) => item.productId === product._id
+  );
+
+  const initialQuantity = existingItem
+    ? existingItem.quantity
+    : 1;
+
+  setSelectedProduct(product._id);
+  setProductSearch(product.name);
+  setQuantity(initialQuantity);
+  setShowProductOptions(false);
+
+  updateProductQuantity(
+    product._id,
+    initialQuantity
+  );
+}}
+                  style={{
+                    padding: "10px 12px",
+                    cursor: "pointer",
+                    borderBottom: "1px solid #f1f3f6",
+                    background:
+                      selectedProduct === product._id
+                        ? "#eef4fb"
+                        : "#ffffff",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: "#263548",
+                    }}
+                  >
+                    {product.name}
                   </div>
 
-                  <div style={productAddRow}>
-
-                    <Form.Group style={{ flex: 1 }}>
-
-                      <Form.Label style={labelStyle}>
-                        Product
-                      </Form.Label>
-
-                      <Form.Select
-                        value={selectedProduct}
-                        onChange={(e) =>
-                          setSelectedProduct(
-                            e.target.value
-                          )
-                        }
-                        style={inputStyle}
-                      >
-
-                        <option value="">
-                          Select product
-                        </option>
-
-                        {products.map((product) => (
-                          <option
-                            key={product._id}
-                            value={product._id}
-                          >
-                            {product.name}
-
-                            {product.code
-                              ? ` (${product.code})`
-                              : ""}
-
-                            {" — ₹"}
-
-                            {Number(
-                              product.sellingPrice || 0
-                            ).toFixed(2)}
-                          </option>
-                        ))}
-
-                      </Form.Select>
-
-                    </Form.Group>
-
-
-                    <Form.Group style={quantityGroup}>
-
-                      <Form.Label style={labelStyle}>
-                        Quantity
-                      </Form.Label>
-
-                      <Form.Control
-                        type="number"
-                        min="1"
-                        value={quantity}
-                        onChange={(e) =>
-                          setQuantity(
-                            e.target.value
-                          )
-                        }
-                        style={inputStyle}
-                      />
-
-                    </Form.Group>
-
-
-                    <Button
-                      type="button"
-                      onClick={handleAddProduct}
-                      style={addButton}
-                    >
-                      <BsPlus size={16} />
-                      Add Product
-                    </Button>
-
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "#64748b",
+                      marginTop: "3px",
+                    }}
+                  >
+                    Selling price: ₹
+                    {Number(
+                      product.sellingPrice || 0
+                    ).toFixed(2)}
                   </div>
-
-
-                  {selectedProductData && (
-                    <div style={selectedProductPreview}>
-
-                      <div style={selectedProductIcon}>
-                        <BsCart3 size={13} />
-                      </div>
-
-                      <div>
-
-                        <div style={selectedProductName}>
-                          {selectedProductData.name}
-                        </div>
-
-                        <div style={selectedProductDetails}>
-                          Selling Price: ₹
-                          {Number(
-                            selectedProductData.sellingPrice || 0
-                          ).toFixed(2)}
-
-                          <span style={dot}>
-                            •
-                          </span>
-
-                          Tax:{" "}
-                          {selectedProductData.tax || 0}%
-                        </div>
-
-                      </div>
-
-                    </div>
-                  )}
-
                 </div>
+              ))
+            ) : (
+              <div
+                style={{
+                  padding: "16px 12px",
+                  textAlign: "center",
+                  fontSize: "12px",
+                  color: "#64748b",
+                }}
+              >
+                No matching products found
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </Form.Group>
 
+    {/* QUANTITY STEPPER */}
+    <Form.Group
+      style={{
+        width: "145px",
+        flexShrink: 0,
+      }}
+    >
+      <Form.Label style={labelStyle}>
+        Quantity
+      </Form.Label>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          height: "42px",
+          border: "1px solid #d7dee8",
+          borderRadius: "8px",
+          overflow: "hidden",
+          background: "#ffffff",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            if (!selectedProduct) return;
+
+            const nextQuantity = Math.max(
+              1,
+              Number(quantity || 1) - 1
+            );
+
+            setQuantity(nextQuantity);
+            updateProductQuantity(
+              selectedProduct,
+              nextQuantity
+            );
+          }}
+          disabled={Number(quantity) <= 1}
+          style={{
+            width: "38px",
+            height: "100%",
+            flexShrink: 0,
+            border: "none",
+            background: "#f5f7fa",
+            color:
+              Number(quantity) <= 1
+                ? "#b8c0cc"
+                : "#344256",
+            fontSize: "20px",
+            cursor:
+              Number(quantity) <= 1
+                ? "not-allowed"
+                : "pointer",
+          }}
+          aria-label="Decrease quantity"
+        >
+          −
+        </button>
+
+        <Form.Control
+          type="number"
+          min="1"
+          step="1"
+          value={quantity}
+          onChange={(e) => {
+            const value = e.target.value;
+
+            setQuantity(value);
+
+            if (
+              selectedProduct &&
+              value !== "" &&
+              Number.isInteger(Number(value)) &&
+              Number(value) >= 1
+            ) {
+              updateProductQuantity(
+                selectedProduct,
+                Number(value)
+              );
+            }
+          }}
+          onBlur={() => {
+            if (
+              quantity === "" ||
+              Number(quantity) < 1
+            ) {
+              setQuantity(1);
+
+              if (selectedProduct) {
+                updateProductQuantity(
+                  selectedProduct,
+                  1
+                );
+              }
+            }
+          }}
+          style={{
+            border: "none",
+            borderRadius: 0,
+            boxShadow: "none",
+            textAlign: "center",
+            padding: "0 2px",
+            minWidth: 0,
+            height: "100%",
+            fontSize: "13px",
+            fontWeight: 600,
+          }}
+          aria-label="Product quantity"
+        />
+
+        <button
+          type="button"
+          onClick={() => {
+            if (!selectedProduct) {
+              alert("Please select a product first.");
+              return;
+            }
+
+            const nextQuantity =
+              Number(quantity || 1) + 1;
+
+            setQuantity(nextQuantity);
+
+            updateProductQuantity(
+              selectedProduct,
+              nextQuantity
+            );
+          }}
+          style={{
+            width: "38px",
+            height: "100%",
+            flexShrink: 0,
+            border: "none",
+            background: "#f5f7fa",
+            color: "#344256",
+            fontSize: "20px",
+            cursor: "pointer",
+          }}
+          aria-label="Increase quantity"
+        >
+          +
+        </button>
+      </div>
+    </Form.Group>
+  </div>
+
+  {/* SELECTED PRODUCT PREVIEW */}
+  {selectedProductData && (
+    <div style={selectedProductPreview}>
+      <div style={selectedProductIcon}>
+        <BsCart3 size={13} />
+      </div>
+
+      <div>
+        <div style={selectedProductName}>
+          {selectedProductData.name}
+        </div>
+
+        <div style={selectedProductDetails}>
+          Selling Price: ₹
+          {Number(
+            selectedProductData.sellingPrice || 0
+          ).toFixed(2)}
+
+          <span style={dot}>•</span>
+
+          Tax: {selectedProductData.tax || 0}%
+        </div>
+      </div>
+    </div>
+  )}
+</div>
 
                 {/* PRODUCT TABLE */}
 
@@ -885,20 +1103,23 @@ export const EditInvoice = () => {
 
 
                             <td style={tableCell}>
+                    <Form.Control
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        handleQuantityChange(index, e.target.value)
+                      }
+                      onBlur={(e) => {
+                        const qty = Number(e.target.value);
 
-                              <Form.Control
-                                type="number"
-                                min="1"
-                                value={item.quantity}
-                                onChange={(e) =>
-                                  handleQuantityChange(
-                                    index,
-                                    e.target.value
-                                  )
-                                }
-                                style={quantityInput}
-                              />
-
+                        if (!Number.isInteger(qty) || qty < 1) {
+                          handleQuantityChange(index, 1);
+                        }
+                      }}
+                      style={quantityInput}
+                    />
                             </td>
 
 
@@ -1082,8 +1303,8 @@ export const EditInvoice = () => {
                         Paid
                       </option>
 
-                      <option value="Pending">
-                        Pending
+                      <option value="Unpaid">
+                        Unpaid
                       </option>
 
                       <option value="Partially Paid">
@@ -1125,6 +1346,47 @@ export const EditInvoice = () => {
                   </Form.Group>
 
                 </div>
+
+{paymentStatus !== "Paid" && (
+  <div style={twoColumn}>
+    <Form.Group>
+      <Form.Label style={labelStyle}>
+        Due Date
+        <span style={required}>*</span>
+      </Form.Label>
+
+      <Form.Control
+        type="date"
+        value={dueDate}
+        onChange={(e) => setDueDate(e.target.value)}
+        required
+        style={inputStyle}
+      />
+    </Form.Group>
+
+    {paymentStatus === "Partially Paid" && (
+      <Form.Group>
+        <Form.Label style={labelStyle}>
+          Amount Received (₹)
+          <span style={required}>*</span>
+        </Form.Label>
+
+        <Form.Control
+          type="number"
+          min="0"
+          max={grandTotal}
+          step="0.01"
+          value={amountReceivedInput}
+          onChange={(e) =>
+            setAmountReceivedInput(e.target.value)
+          }
+          required
+          style={inputStyle}
+        />
+      </Form.Group>
+    )}
+  </div>
+)}
 
               </Card.Body>
 
@@ -1353,6 +1615,72 @@ export const EditInvoice = () => {
                     {items.length}
                   </strong>
                 </div>
+
+<div style={paymentRow}>
+  <span>Invoice Total</span>
+  <strong>₹{grandTotal.toFixed(2)}</strong>
+</div>
+
+<div style={paymentRow}>
+  <span>Amount Received</span>
+  <strong style={{ color: "#047857" }}>
+    ₹{amountReceived.toFixed(2)}
+  </strong>
+</div>
+
+<div style={paymentRow}>
+  <span>Pending Amount</span>
+  <strong
+    style={{
+      color: balanceDue > 0 ? "#dc3545" : "#047857",
+    }}
+  >
+    ₹{balanceDue.toFixed(2)}
+  </strong>
+</div>
+
+{paymentStatus !== "Paid" && dueDate && (
+  <>
+    <div style={paymentRow}>
+      <span>Due Date</span>
+      <strong style={{ color: "#b45309" }}>
+        {new Date(
+          `${dueDate}T00:00:00`
+        ).toLocaleDateString("en-IN")}
+      </strong>
+    </div>
+
+    {balanceDue > 0 && (
+      <div
+        style={{
+          marginTop: "10px",
+          padding: "11px",
+          border: "1px solid #f3dfae",
+          borderRadius: "6px",
+          backgroundColor: "#fffbeb",
+          color: "#92400e",
+          fontSize: "9px",
+          lineHeight: 1.6,
+        }}
+      >
+        <div
+          style={{
+            fontWeight: 700,
+            marginBottom: "3px",
+          }}
+        >
+          Payment Reminder
+        </div>
+
+        Collect ₹{balanceDue.toFixed(2)} from{" "}
+        {selectedCustomer?.name || "the customer"} by{" "}
+        {new Date(
+          `${dueDate}T00:00:00`
+        ).toLocaleDateString("en-IN")}.
+      </div>
+    )}
+  </>
+)}
 
               </div>
 
@@ -1739,13 +2067,11 @@ const customerPreview = {
   display: "flex",
   alignItems: "center",
   gap: "10px",
-  marginTop: "13px",
-  padding: "10px 11px",
-  border: "1px solid #e1e6ea",
+  padding: "11px 13px",
+  border: "1px solid #dfe5ea",
   borderRadius: "6px",
   backgroundColor: "#f8fafb",
 };
-
 const customerAvatar = {
   width: "33px",
   height: "33px",
