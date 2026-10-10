@@ -726,33 +726,24 @@ const invoiceData = {
       background: "#ffffff",
     }}
   >
-    <button
-      type="button"
-onClick={() => {
-  if (!selectedProduct) return;
+<button
+  type="button"
+  onClick={() => {
+    if (!selectedProduct) return;
 
-  const nextQuantity = Math.max(
-    1,
-    Number(quantity || 1) - 1
-  );
+    const nextQuantity = Math.max(
+      1,
+      Number(quantity || 1) - 1
+    );
 
-  setQuantity(nextQuantity);
-  addProduct(selectedProduct, nextQuantity);
-}}
-      disabled={Number(quantity) <= 1}
-      style={{
-        width: "38px",
-        height: "100%",
-        border: "none",
-        background: "#f5f7fa",
-        color: Number(quantity) <= 1 ? "#b8c0cc" : "#344256",
-        fontSize: "20px",
-        cursor: Number(quantity) <= 1 ? "not-allowed" : "pointer",
-      }}
-      aria-label="Decrease quantity"
-    >
-      −
-    </button>
+    setQuantity(nextQuantity);
+    addProduct(selectedProduct, nextQuantity);
+  }}
+  disabled={Number(quantity) <= 1}
+>
+  −
+</button>
+
 
     <Form.Control
       type="number"
@@ -798,33 +789,22 @@ onBlur={() => {
       aria-label="Product quantity"
     />
 
-    <button
+<button
+  type="button"
+  onClick={() => {
+    if (!selectedProduct) {
+      alert("Please select a product first.");
+      return;
+    }
 
-onClick={() => {
-  if (!selectedProduct) {
-    alert("Please select a product first.");
-    return;
-  }
+    const nextQuantity = Number(quantity || 1) + 1;
 
-  const nextQuantity = Number(quantity || 1) + 1;
-
-  setQuantity(nextQuantity);
-  addProduct(selectedProduct, nextQuantity);
-}}
-
-      style={{
-        width: "38px",
-        height: "100%",
-        border: "none",
-        background: "#f5f7fa",
-        color: "#344256",
-        fontSize: "20px",
-        cursor: "pointer",
-      }}
-      aria-label="Increase quantity"
-    >
-      +
-    </button>
+    setQuantity(nextQuantity);
+    addProduct(selectedProduct, nextQuantity);
+  }}
+>
+  +
+</button>
   </div>
 </Form.Group>
                  </div>

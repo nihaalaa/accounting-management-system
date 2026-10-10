@@ -511,16 +511,80 @@ function cleanInvoiceData(data) {
 // ADD INVOICE
 
 app.post("/invoices", async (req, res) => {
+  const deductedStock = [];
+
   try {
-    const invoice = new Invoice(cleanInvoiceData(req.body));
+    const invoiceData = cleanInvoiceData(req.body);
+console.log("POST /invoices route called");
+console.log("Invoice items:", JSON.stringify(invoiceData.items, null, 2));
+    if (!invoiceData.items || invoiceData.items.length === 0) {
+      return res.status(400).json({
+        message: "Invoice must contain at least one product",
+      });
+    }
+
+    // Combine quantities if the same product appears more than once
+    const productQuantities = new Map();
+
+    for (const item of invoiceData.items) {
+      const productId = String(item.productId);
+      const quantity = Number(item.quantity);
+
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        throw new Error("Product quantity must be a positive integer");
+      }
+
+      productQuantities.set(
+        productId,
+        (productQuantities.get(productId) || 0) + quantity
+      );
+    }
+
+    // Reduce stock only when enough stock is available
+    for (const [productId, quantity] of productQuantities) {
+      const product = await Product.findOneAndUpdate(
+        {
+          _id: productId,
+          currentStock: { $gte: quantity },
+        },
+        {
+          $inc: { currentStock: -quantity },
+        },
+        { new: true }
+      );
+
+      if (!product) {
+        throw new Error(
+          `Insufficient stock or product not found: ${productId}`
+        );
+      }
+
+      // Remember each deduction in case invoice saving fails
+      deductedStock.push({ productId, quantity });
+    }
+
+    // Save invoice after stock deductions succeed
+    const invoice = new Invoice(invoiceData);
     const savedInvoice = await invoice.save();
 
     return res.status(201).json({
-      message: "Invoice saved successfully",
+      message: "Invoice saved and stock updated successfully",
       invoice: savedInvoice,
     });
   } catch (error) {
     console.error("Save invoice error:", error);
+
+    // Restore deducted stock if any step fails
+    for (const item of deductedStock) {
+      try {
+        await Product.updateOne(
+          { _id: item.productId },
+          { $inc: { currentStock: item.quantity } }
+        );
+      } catch (rollbackError) {
+        console.error("Stock rollback error:", rollbackError);
+      }
+    }
 
     return res.status(400).json({
       message: "Failed to save invoice",
@@ -528,6 +592,7 @@ app.post("/invoices", async (req, res) => {
     });
   }
 });
+
 
 // GET ALL INVOICES
 app.get("/invoices", async (req, res) => {

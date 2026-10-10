@@ -429,7 +429,7 @@ const pdfStyles = StyleSheet.create({
    SHOPLEDGER PDF COMPONENT
 ========================================================= */
 
-const InvoicePDF = ({ invoice }) => {
+export const InvoicePDF = ({ invoice }) => {
 
   /* =======================================================
      HELPERS
@@ -444,14 +444,14 @@ const InvoicePDF = ({ invoice }) => {
       year: "numeric",
     });
   };
+const formatCurrency = (amount) => {
+  const value = Number(amount ?? 0);
 
-
-  const formatCurrency = (amount) => {
-    return `₹${Number(amount || 0).toLocaleString("en-IN", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  };
+  return `Rs. ${value.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
 
 
   /* =======================================================
@@ -525,11 +525,6 @@ const InvoicePDF = ({ invoice }) => {
   ======================================================= */
 
   const items = invoice.items || [];
-
-
-  /* =======================================================
-     RENDER
-  ======================================================= */
 
   return (
     <Document>
@@ -929,7 +924,7 @@ const InvoicePDF = ({ invoice }) => {
               </Text>
 
               <Text style={pdfStyles.totalValue}>
-formatCurrency(invoice.taxAmount ?? invoice.tax ?? 0)              </Text>
+{formatCurrency(invoice.taxAmount ?? invoice.tax ?? 0)}           </Text>
 
             </View>
 
@@ -1009,7 +1004,18 @@ export const ViewInvoice = () => {
 
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
+useEffect(() => {
+  const shouldPrint =
+    new URLSearchParams(window.location.search).get("print") === "1";
 
+  if (!shouldPrint || loading || !invoice) return;
+
+  const timer = setTimeout(() => {
+    window.print();
+  }, 700);
+
+  return () => clearTimeout(timer);
+}, [loading, invoice]);
 
   /* =======================================================
      FETCH INVOICE

@@ -316,10 +316,10 @@ if (status === "Partially Paid") {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!customerId) {
-      alert("Please select a customer");
-      return;
-    }
+    // if (!customerId) {
+    //   alert("Please select a customer");
+    //   return;
+    // }
 
     if (items.length === 0) {
       alert("Please add at least one product");

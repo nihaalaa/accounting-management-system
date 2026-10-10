@@ -12,7 +12,10 @@ import {
   BsCheckCircle,
   BsClock,
   BsCurrencyRupee,
+    BsPrinter,
 } from "react-icons/bs";
+import { pdf } from "@react-pdf/renderer";
+import { InvoicePDF } from "./ViewInvoice";
 
 export const Invoices = () => {
   const navigate = useNavigate();
@@ -226,6 +229,38 @@ export const Invoices = () => {
     (invoice) =>
       invoice.paymentStatus === "Pending"
   );
+
+// =========================
+// PRINT & AUTO-DOWNLOAD PDF
+// =========================
+
+
+const handlePrintInvoice = async (invoice) => {
+  try {
+    const blob = await pdf(
+      <InvoicePDF invoice={invoice} />
+    ).toBlob();
+
+    // Automatically download the PDF
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `Invoice_${invoice.invoiceNumber || invoice._id}.pdf`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Open the browser print dialog for the current invoice page
+    navigate(`/invoices/view/${invoice._id}?print=1`);
+
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (error) {
+    console.error("Error generating invoice PDF:", error);
+    alert("Failed to generate invoice PDF.");
+  }
+};
 
   return (
     <div style={pageStyle}>
@@ -698,8 +733,20 @@ export const Invoices = () => {
                             title="Edit Invoice"
                           >
                             <BsPencil size={13} />
-                          </Button>
+                        </Button>
 
+            {/* PRINT & DOWNLOAD */}
+
+            <Button
+              variant="light"
+              size="sm"
+              onClick={() => handlePrintInvoice(invoice)}
+              style={printButtonStyle}
+              title="Print & Download Invoice"
+              aria-label="Print and download invoice"
+            >
+              <BsPrinter size={13} />
+            </Button>
 
                           {/* DELETE */}
 
@@ -1410,4 +1457,16 @@ const pageNumberStyle = {
   height: "29px",
   fontSize: "10px",
   cursor: "pointer",
+};
+const printButtonStyle = {
+  width: "30px",
+  height: "30px",
+  padding: 0,
+  border: "1px solid #d9e0e6",
+  backgroundColor: "#ffffff",
+  color: "#2563a6",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "5px",
 };
