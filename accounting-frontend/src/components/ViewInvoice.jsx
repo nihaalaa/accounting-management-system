@@ -1030,7 +1030,7 @@ useEffect(() => {
         setLoading(true);
 
         const response = await axios.get(
-          `http://localhost:5000/invoices/${id}`
+          `${import.meta.env.VITE_API_URL}/invoices/${id}`
         );
 
         setInvoice(response.data);
