@@ -218,9 +218,9 @@ const balanceDue = Math.max(
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-if (!customerId) {
-  return;
-}
+// if (!customerId) {
+//   return;
+// }
     if (items.length === 0) {
       alert("Please add at least one product");
       return;
@@ -254,18 +254,18 @@ const customer = customers.find(
   (c) => c._id === customerId
 );
 
-if (!customer) {
-  alert("Please select a valid customer.");
-  return;
-}
+// if (!customer) {
+//   alert("Please select a valid customer.");
+//   return;
+// }
 
 const invoiceData = {
   invoiceNumber,
   date,
-  customerId: customer._id,
-  customerName: customer.name,
-  customerPhone: customer.phone || "",
-  customerAddress: customer.address || "",
+  customerId: customerId || null,
+  customerName: selectedCustomer?.name || "Walk-in Customer",
+  customerPhone: selectedCustomer?.phone || "",
+  customerAddress: selectedCustomer?.address || "",
   items,
   subtotal,
   taxAmount,
@@ -273,10 +273,9 @@ const invoiceData = {
   grandTotal,
   paymentMethod,
   paymentStatus,
-    amountReceived,
+  amountReceived,
   balanceDue,
-  dueDate: paymentStatus === "Paid" ? null : dueDate,
-  
+  dueDate: paymentStatus === "Paid" ? null : dueDate || null,
   notes,
 };
 
@@ -490,10 +489,7 @@ const invoiceData = {
                     }
                     style={inputStyle}
                    >
-
-                    <option value="">
-                      Select customer
-                    </option>
+<option value="">Walk-in Customer </option>
 
                     {customers.map((customer) => (
                       <option
