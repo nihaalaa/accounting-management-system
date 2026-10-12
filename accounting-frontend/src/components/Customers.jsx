@@ -9,6 +9,7 @@ import {
   BsPerson,
   BsSearch,
   BsPeople,
+  BsEye,
 } from "react-icons/bs";
 
 export const Customers = () => {
@@ -81,22 +82,26 @@ export const Customers = () => {
   const handleEdit = (id) => {
     navigate(`/customers/edit/${id}`);
   };
-
+const handleView = (id) => {
+  navigate(`/customers/view/${id}`);
+};
   // =========================
   // SEARCH + CUSTOMER TYPE FILTER
   // =========================
 
-  const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch = customer.name
-      ?.toLowerCase()
-      .includes(search.toLowerCase());
+const filteredCustomers = customers.filter((customer) => {
+  const searchTerm = search.toLowerCase().trim();
 
-    const matchesType =
-      customerType === "All" ||
-      customer.customerType === customerType;
+  const matchesSearch =
+    customer.name?.toLowerCase().includes(searchTerm) ||
+    customer.phone?.toString().includes(searchTerm);
 
-    return matchesSearch && matchesType;
-  });
+  const matchesType =
+    customerType === "All" ||
+    customer.customerType === customerType;
+
+  return matchesSearch && matchesType;
+});
 
   // =========================
   // PAGINATION
@@ -412,6 +417,15 @@ export const Customers = () => {
 
                         <div style={actionContainer}>
 
+                    <Button
+                      variant="light"
+                      size="sm"
+                      onClick={() => handleView(customer._id)}
+                      style={viewButtonStyle}
+                    >
+                      <BsEye size={13} />
+                    </Button>
+
                           <Button
                             variant="light"
                             size="sm"
@@ -423,7 +437,6 @@ export const Customers = () => {
                             style={editButtonStyle}
                           >
                             <BsPencil size={13} />
-                            Edit
                           </Button>
 
 
@@ -438,7 +451,6 @@ export const Customers = () => {
                             style={deleteButtonStyle}
                           >
                             <BsTrash size={13} />
-                            Delete
                           </Button>
 
                         </div>
@@ -862,24 +874,43 @@ const actionContainer = {
   gap: "6px",
 };
 
-const editButtonStyle = {
-  border: "1px solid #d1d5db",
-  color: "#374151",
+const viewButtonStyle = {
+  width: "30px",
+  height: "30px",
+  padding: 0,
+  border: "1px solid #d9e0e6",
   backgroundColor: "#ffffff",
+  color: "#4b6985",
   display: "flex",
   alignItems: "center",
-  gap: "5px",
-  fontSize: "11px",
+  justifyContent: "center",
+  borderRadius: "5px",
+};
+
+const editButtonStyle = {
+  width: "30px",
+  height: "30px",
+  padding: 0,
+  border: "1px solid #d9e0e6",
+  backgroundColor: "#ffffff",
+  color: "#596675",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "5px",
 };
 
 const deleteButtonStyle = {
-  border: "1px solid #fecaca",
-  color: "#dc2626",
+  width: "30px",
+  height: "30px",
+  padding: 0,
+  border: "1px solid #f1caca",
   backgroundColor: "#ffffff",
+  color: "#dc2626",
   display: "flex",
   alignItems: "center",
-  gap: "5px",
-  fontSize: "11px",
+  justifyContent: "center",
+  borderRadius: "5px",
 };
 
 

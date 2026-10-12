@@ -486,23 +486,24 @@ const formatCurrency = (amount) => {
      PAYMENT DATA
   ======================================================= */
 
-  const paymentStatus = String(invoice.paymentStatus || "Unpaid");
-  const paymentStatusLower = paymentStatus.toLowerCase();
-  const grandTotal = Number(invoice.grandTotal || 0);
+const paymentStatus = String(invoice.paymentStatus || "Unpaid");
+const paymentStatusLower = paymentStatus.trim().toLowerCase();
 
-  const amountReceived =
-    invoice.amountReceived != null
-      ? Number(invoice.amountReceived)
-      : paymentStatusLower === "paid"
-        ? grandTotal
-        : 0;
+const grandTotal = Number(invoice.grandTotal || 0);
 
-  const balanceDue =
-    invoice.balanceDue != null
+const amountReceived =
+  paymentStatusLower === "paid"
+    ? grandTotal
+    : Number(invoice.amountReceived ?? 0);
+
+const balanceDue =
+  paymentStatusLower === "paid"
+    ? 0
+    : invoice.balanceDue != null
       ? Number(invoice.balanceDue)
       : Math.max(0, grandTotal - amountReceived);
 
-  const dueDate = invoice.dueDate;
+const dueDate = invoice.dueDate;
 
   let statusStyle = pdfStyles.statusDefault;
 
@@ -1720,7 +1721,13 @@ if (
                 <BsPrinter size={15} />
 
               </Button>
-
+            <Button
+              variant="secondary"
+              onClick={() => navigate(-1)}
+              style={backButtonStyle}
+            >
+              Close
+            </Button>
             </div>
 
           </div>

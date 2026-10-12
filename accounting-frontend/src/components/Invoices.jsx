@@ -227,7 +227,7 @@ export const Invoices = () => {
 
   const pendingInvoices = invoices.filter(
     (invoice) =>
-      invoice.paymentStatus === "Pending"
+      invoice.paymentStatus === "Unpaid" || "Partially Paid"
   );
 
 // =========================
@@ -514,7 +514,7 @@ const handlePrintInvoice = async (invoice) => {
                 </th>
 
                 <th style={thStyle}>
-                  PAYMENT
+                  PAYMENT METHOD
                 </th>
 
                 <th style={thStyle}>

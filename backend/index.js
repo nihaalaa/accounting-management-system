@@ -598,7 +598,7 @@ console.log("Invoice items:", JSON.stringify(invoiceData.items, null, 2));
 app.get("/invoices", async (req, res) => {
   try {
     const invoices = await Invoice.find()
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 });
 
     res.status(200).json(invoices);
   } catch (error) {
