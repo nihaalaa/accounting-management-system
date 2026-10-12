@@ -486,10 +486,14 @@ const formatCurrency = (amount) => {
      PAYMENT DATA
   ======================================================= */
 
-const paymentStatus = String(invoice.paymentStatus || "Unpaid");
-const paymentStatusLower = paymentStatus.trim().toLowerCase();
+const paymentStatus =
+  String(invoice.paymentStatus || "Unpaid").trim();
 
-const grandTotal = Number(invoice.grandTotal || 0);
+const paymentStatusLower =
+  paymentStatus.toLowerCase();
+
+const grandTotal =
+  Number(invoice.grandTotal || 0);
 
 const amountReceived =
   paymentStatusLower === "paid"
@@ -504,6 +508,7 @@ const balanceDue =
       : Math.max(0, grandTotal - amountReceived);
 
 const dueDate = invoice.dueDate;
+
 
   let statusStyle = pdfStyles.statusDefault;
 
@@ -1288,31 +1293,32 @@ if (
 
 
   /* =======================================================
-     PAYMENT
-  ======================================================= */
+   PAYMENT
+======================================================= */
 
-  const paymentStatus =
-    invoice.paymentStatus || "Unpaid";
+const paymentStatus = String(
+  invoice.paymentStatus || "Unpaid"
+).trim();
 
-  const grandTotal =
-    Number(invoice.grandTotal || 0);
+const paymentStatusLower = paymentStatus.toLowerCase();
 
-  const amountReceived =
-    invoice.amountReceived != null
-      ? Number(invoice.amountReceived)
-      : paymentStatus.toLowerCase() === "paid"
-        ? grandTotal
-        : 0;
+const grandTotal = Number(invoice.grandTotal || 0);
 
-  const balanceDue =
-    invoice.balanceDue != null
+const amountReceived =
+  paymentStatusLower === "paid"
+    ? grandTotal
+    : Number(invoice.amountReceived ?? 0);
+
+const balanceDue =
+  paymentStatusLower === "paid"
+    ? 0
+    : invoice.balanceDue != null
       ? Number(invoice.balanceDue)
       : Math.max(0, grandTotal - amountReceived);
 
-  const dueDate = invoice.dueDate;
+const dueDate = invoice.dueDate;
 
-  const paymentBadgeStyle =
-    getPaymentBadge(paymentStatus);
+const paymentBadgeStyle = getPaymentBadge(paymentStatus);
 
   /* =======================================================
      PAGE STYLES

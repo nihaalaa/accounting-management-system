@@ -31,7 +31,30 @@ const formatDate = (date) => {
     ? "-"
     : parsedDate.toLocaleDateString("en-IN");
 };
+const getInvoicePaymentAmounts = (invoice) => {
+  const total = Number(invoice.grandTotal || 0);
 
+  const status = String(
+    invoice.paymentStatus || "Unpaid"
+  ).trim().toLowerCase();
+
+  const paid =
+    status === "paid"
+      ? total
+      : Math.min(
+          total,
+          Math.max(0, Number(invoice.amountReceived ?? 0))
+        );
+
+  const outstanding =
+    status === "paid"
+      ? 0
+      : invoice.balanceDue != null
+        ? Math.max(0, Number(invoice.balanceDue))
+        : Math.max(0, total - paid);
+
+  return { paid, outstanding };
+};
 const ViewCustomer = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -94,24 +117,17 @@ const ViewCustomer = () => {
     0
   );
 
-  const totalPaid = invoices.reduce(
-    (sum, invoice) => sum + Number(invoice.amountReceived || 0),
-    0
-  );
+const totalPaid = invoices.reduce(
+  (sum, invoice) =>
+    sum + getInvoicePaymentAmounts(invoice).paid,
+  0
+);
 
-  const outstandingBalance = invoices.reduce(
-    (sum, invoice) =>
-      sum +
-      Number(
-        invoice.balanceDue ??
-          Math.max(
-            0,
-            Number(invoice.grandTotal || 0) -
-              Number(invoice.amountReceived || 0)
-          )
-      ),
-    0
-  );
+const outstandingBalance = invoices.reduce(
+  (sum, invoice) =>
+    sum + getInvoicePaymentAmounts(invoice).outstanding,
+  0
+);
 
   if (loading) {
     return (
@@ -413,16 +429,11 @@ const ViewCustomer = () => {
             <tbody>
               {invoices.length > 0 ? (
                 invoices.map((invoice) => {
-                  const balance = Number(
-                    invoice.balanceDue ??
-                      Math.max(
-                        0,
-                        Number(invoice.grandTotal || 0) -
-                          Number(invoice.amountReceived || 0)
-                      )
-                  );
 
-                  const status = invoice.paymentStatus || "Unknown";
+                    const { paid, outstanding: balance } =
+                    getInvoicePaymentAmounts(invoice);
+
+                    const status = invoice.paymentStatus || "Unknown";
 
                   const badgeStyle =
                     status === "Paid"
@@ -434,7 +445,7 @@ const ViewCustomer = () => {
                       : status === "Unknown"
                       ? statusStyles.unknown
                       : statusStyles.other;
-
+                
                   return (
                     <tr key={invoice._id}>
                       <td>
@@ -449,9 +460,9 @@ const ViewCustomer = () => {
                         {formatCurrency(invoice.grandTotal)}
                       </td>
 
-                      <td style={{ ...amountStyle, color: "#198754" }}>
-                        {formatCurrency(invoice.amountReceived)}
-                      </td>
+                    <td style={{ ...amountStyle, color: "#198754" }}>
+                    {formatCurrency(paid)}
+                    </td>
 
                       <td
                         style={{

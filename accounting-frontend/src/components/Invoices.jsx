@@ -209,26 +209,74 @@ export const Invoices = () => {
     })}`;
   };
 
+
   // =========================
   // SUMMARY
   // =========================
 
   const totalAmount = invoices.reduce(
     (total, invoice) =>
-      total +
-      Number(invoice.grandTotal || 0),
+      total + Number(invoice.grandTotal || 0),
     0
   );
 
   const paidInvoices = invoices.filter(
-    (invoice) =>
-      invoice.paymentStatus === "Paid"
+    (invoice) => invoice.paymentStatus === "Paid"
   );
 
   const pendingInvoices = invoices.filter(
     (invoice) =>
-      invoice.paymentStatus === "Unpaid" || "Partially Paid"
+      invoice.paymentStatus === "Unpaid" ||
+      invoice.paymentStatus === "Pending" ||
+      invoice.paymentStatus === "Partially Paid"
   );
+
+  // OUTSTANDING AMOUNT
+  const outstandingAmount = invoices.reduce(
+    (total, invoice) => {
+      if (invoice.paymentStatus === "Paid") {
+        return total;
+      }
+
+      const balance = Number(
+        invoice.balanceDue ??
+        (
+          Number(invoice.grandTotal || 0) -
+          Number(invoice.amountReceived || 0)
+        )
+      );
+
+      return total + Math.max(0, balance);
+    },
+    0
+  );
+
+  // OVERDUE INVOICES
+  const overdueInvoices = invoices.filter((invoice) => {
+    if (
+      invoice.paymentStatus === "Paid" ||
+      !invoice.dueDate
+    ) {
+      return false;
+    }
+
+    const dueDate = new Date(invoice.dueDate);
+    const today = new Date();
+
+    // Compare calendar dates, ignoring the time
+    dueDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    const balance = Number(
+      invoice.balanceDue ??
+      (
+        Number(invoice.grandTotal || 0) -
+        Number(invoice.amountReceived || 0)
+      )
+    );
+
+    return dueDate < today && balance > 0;
+  });
 
 // =========================
 // PRINT & AUTO-DOWNLOAD PDF
@@ -418,7 +466,63 @@ const handlePrintInvoice = async (invoice) => {
 
         </div>
 
+  {/* OUTSTANDING AMOUNT */}
+
+  <div style={summaryCard}>
+    <div
+      style={{
+        ...summaryIcon,
+        backgroundColor: "#fff7ed",
+        color: "#c2410c",
+      }}
+    >
+      <BsCurrencyRupee />
+    </div>
+
+    <div>
+      <div style={summaryLabel}>
+        Outstanding Amount
       </div>
+
+      <div style={summaryNumber}>
+        {formatAmount(outstandingAmount)}
+      </div>
+
+      <div style={summaryHint}>
+        Amount to collect from customers
+      </div>
+    </div>
+  </div>
+
+  {/* OVERDUE INVOICES */}
+
+  <div style={summaryCard}>
+    <div
+      style={{
+        ...summaryIcon,
+        backgroundColor: "#fef2f2",
+        color: "#dc2626",
+      }}
+    >
+      <BsClock />
+    </div>
+
+    <div>
+      <div style={summaryLabel}>
+        Overdue Invoices
+      </div>
+
+      <div style={summaryNumber}>
+        {overdueInvoices.length}
+      </div>
+
+      <div style={summaryHint}>
+        Past due date and unpaid
+      </div>
+    </div>
+  </div>
+      </div>
+
 
 
       {/* =====================================
@@ -1020,29 +1124,29 @@ const subtitleStyle = {
    SUMMARY
 ===================================================== */
 
+
 const summaryContainer = {
   display: "grid",
-  gridTemplateColumns:
-    "repeat(4, minmax(0, 1fr))",
-  gap: "14px",
+  gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+  gap: "10px",
   marginBottom: "20px",
 };
-
 const summaryCard = {
   display: "flex",
   alignItems: "center",
-  gap: "12px",
-  padding: "16px",
+  gap: "8px",
+  padding: "14px 10px",
+  minWidth: 0,
+  minHeight: "85px",
   backgroundColor: "#ffffff",
-  border: "1px solid #e4e9ee",
+  border: "1px solid #e2e8f0",
   borderRadius: "8px",
-  boxShadow:
-    "0 1px 2px rgba(15, 23, 42, 0.025)",
+  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.025)",
 };
 
 const summaryIcon = {
-  width: "39px",
-  height: "39px",
+  width: "34px",
+  height: "34px",
   flexShrink: 0,
   borderRadius: "7px",
   backgroundColor: "#edf3f7",
@@ -1050,26 +1154,27 @@ const summaryIcon = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: "17px",
+  fontSize: "15px",
 };
 
 const summaryLabel = {
-  fontSize: "11px",
+  fontSize: "10px",
   color: "#7b8794",
   fontWeight: "500",
 };
 
 const summaryNumber = {
-  fontSize: "19px",
+  fontSize: "15px",
   fontWeight: "650",
   color: "#1f2937",
-  marginTop: "2px",
+  marginTop: "3px",
+  overflowWrap: "anywhere",
 };
 
 const summaryHint = {
   fontSize: "9px",
   color: "#a0aab5",
-  marginTop: "2px",
+  marginTop: "3px",
 };
 
 
