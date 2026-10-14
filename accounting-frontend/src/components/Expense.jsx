@@ -14,6 +14,7 @@ export const Expenses = () => {
   const [search, setSearch] = useState("");
 const [fromDate, setFromDate] = useState("")
 const [toDate, setToDate] = useState("")
+const [selectedCategory, setSelectedCategory] = useState("All");
   // PAGINATION
   const [currentPage, setCurrentPage] = useState(1);
   const expensesPerPage = 3;
@@ -60,19 +61,29 @@ const [toDate, setToDate] = useState("")
     }
   };
 
+  // UNIQUE EXPENSE CATEGORIES
+const categories = [
+  ...new Set(
+    expenses
+      .map((expense) => expense.category)
+      .filter(Boolean)
+  ),
+];
 
-  // SEARCH
+// SEARCH + CATEGORY + DATE FILTERING
 const filteredExpenses = expenses.filter((expense) => {
-
   const matchSearch = expense.name
     .toLowerCase()
     .includes(search.toLowerCase());
 
+  const matchCategory =
+    selectedCategory === "All" ||
+    expense.category === selectedCategory;
+
   const expenseDate = new Date(expense.date);
 
   const matchesFromDate =
-    !fromDate ||
-    expenseDate >= new Date(fromDate);
+    !fromDate || expenseDate >= new Date(fromDate);
 
   const matchesToDate =
     !toDate ||
@@ -80,13 +91,11 @@ const filteredExpenses = expenses.filter((expense) => {
 
   return (
     matchSearch &&
+    matchCategory &&
     matchesFromDate &&
     matchesToDate
   );
 });
-
-
-
   // PAGINATION
   const indexOfLastExpense =
     currentPage * expensesPerPage;
@@ -232,28 +241,41 @@ const filteredExpenses = expenses.filter((expense) => {
 
           </div>
 
+{/* SEARCH + CATEGORY FILTER */}
 
-          {/* SEARCH */}
+<div style={searchContainerStyle}>
+  <select
+    value={selectedCategory}
+    onChange={(e) => {
+      setSelectedCategory(e.target.value);
+      setCurrentPage(1);
+    }}
+    style={categorySelectStyle}
+  >
+    <option value="All">All Categories</option>
 
-          <div style={searchContainerStyle}>
+    {categories.map((category) => (
+      <option key={category} value={category}>
+        {category}
+      </option>
+    ))}
+  </select>
 
-            <input
-              type="text"
-              placeholder="Search expenses..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-              style={searchInputStyle}
-            />
+  <input
+    type="text"
+    placeholder="Search expenses..."
+    value={search}
+    onChange={(e) => {
+      setSearch(e.target.value);
+      setCurrentPage(1);
+    }}
+    style={searchInputStyle}
+  />
 
-            <span style={countBadgeStyle}>
-              {filteredExpenses.length} Expenses
-            </span>
-
-          </div>
-
+  <span style={countBadgeStyle}>
+    {filteredExpenses.length} Expenses
+  </span>
+</div>
         </div>
 
 
@@ -679,6 +701,19 @@ const searchInputStyle = {
   fontSize: "12px",
   color: "#374151",
   backgroundColor: "#ffffff",
+};
+
+const categorySelectStyle = {
+  width: "160px",
+  height: "34px",
+  padding: "0 10px",
+  border: "1px solid #d1d5db",
+  borderRadius: "6px",
+  outline: "none",
+  fontSize: "12px",
+  color: "#374151",
+  backgroundColor: "#ffffff",
+  cursor: "pointer",
 };
 
 const countBadgeStyle = {

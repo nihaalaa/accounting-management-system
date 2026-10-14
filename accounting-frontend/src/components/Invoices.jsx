@@ -625,6 +625,14 @@ const handlePrintInvoice = async (invoice) => {
                   STATUS
                 </th>
 
+            <th style={thStyle}>
+              PAID AMOUNT
+            </th>
+
+            <th style={thStyle}>
+              BALANCE AMOUNT
+            </th>
+
                 <th
                   style={{
                     ...thStyle,
@@ -790,6 +798,44 @@ const handlePrintInvoice = async (invoice) => {
                         </span>
 
                       </td>
+
+              {/* PAID AMOUNT */}
+              <td style={tdStyle}>
+                <span
+                  style={{
+                    ...amountStyle,
+                    color: "#047857",
+                  }}
+                >
+                  {formatAmount(
+                    invoice.paymentStatus === "Paid"
+                      ? invoice.grandTotal
+                      : invoice.paymentStatus === "Unpaid"
+                      ? 0
+                      : invoice.amountReceived || 0
+                  )}
+                </span>
+              </td>
+
+              {/* BALANCE AMOUNT */}
+              <td style={tdStyle}>
+                <span
+                  style={{
+                    ...amountStyle,
+                    color: "#c2410c",
+                  }}
+                >
+                  {formatAmount(
+                    invoice.paymentStatus === "Paid"
+                      ? 0
+                      : Math.max(
+                          0,
+                          Number(invoice.grandTotal || 0) -
+                            Number(invoice.amountReceived || 0)
+                        )
+                  )}
+                </span>
+              </td>
 
 
                       {/* ACTIONS */}
