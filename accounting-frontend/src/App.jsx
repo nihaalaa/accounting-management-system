@@ -20,6 +20,7 @@ import { ViewInvoice } from "./components/ViewInvoice";
 import { EditInvoice } from "./components/EditInvoice";
 import Dashboard from "./components/Dashboard";
 import ViewCustomer from "./components/ViewCustomer";
+import Suppliers from "./components/Suppliers";
 
 function App() {
    return (
@@ -41,6 +42,7 @@ function App() {
             <Route path='/customers/add' element={<AddCustomers />}/>
             <Route path='/customers/edit/:id' element={<EditCustomers />}/>
             <Route path='/customers/view/:id' element={<ViewCustomer />} />
+            <Route path="/suppliers" element={<Suppliers />} />
 <Route path="/expenses/add" element={<AddExpense />} />
 <Route
   path="/expenses/edit/:id"

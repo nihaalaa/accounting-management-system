@@ -14,6 +14,7 @@ const Expense = require("./models/Expense");
 const Customer = require("./models/Customer")
 const Invoice = require("./models/Invoice");
 const Counter = require("./models/Counter");
+const Supplier = require("./models/Supplier");
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("mongodb connected"))
@@ -684,6 +685,230 @@ app.delete("/invoices/:id", async (req, res) => {
     });
   }
 });
+
+
+/* =========================
+   SUPPLIER ROUTES
+========================= */
+
+// GET all active suppliers
+app.get("/suppliers", async (req, res) => {
+  try {
+    const suppliers = await Supplier.find({ isActive: true })
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(suppliers);
+  } catch (error) {
+    console.error("Fetch suppliers error:", error);
+    res.status(500).json({
+      message: "Failed to fetch suppliers.",
+    });
+  }
+});
+
+// GET a single supplier
+app.get("/suppliers/:id", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: "Invalid supplier ID.",
+      });
+    }
+
+    const supplier = await Supplier.findOne({
+      _id: req.params.id,
+      isActive: true,
+    });
+
+    if (!supplier) {
+      return res.status(404).json({
+        message: "Supplier not found.",
+      });
+    }
+
+    res.status(200).json(supplier);
+  } catch (error) {
+    console.error("Fetch supplier error:", error);
+    res.status(500).json({
+      message: "Failed to fetch supplier.",
+    });
+  }
+});
+
+// ADD a supplier
+app.post("/suppliers", async (req, res) => {
+  try {
+    const {
+      supplierName,
+      phone,
+      email,
+      address,
+      companyName,
+      gstNumber,
+      openingBalance,
+      notes,
+    } = req.body;
+
+    if (
+      !supplierName?.trim() ||
+      !phone?.trim() ||
+      !address?.trim()
+    ) {
+      return res.status(400).json({
+        message: "Supplier name, phone and address are required.",
+      });
+    }
+
+    const balance = Number(openingBalance ?? 0);
+
+    if (!Number.isFinite(balance) || balance < 0) {
+      return res.status(400).json({
+        message: "Opening balance must be zero or greater.",
+      });
+    }
+
+    const supplier = await Supplier.create({
+      supplierName: supplierName.trim(),
+      phone: phone.trim(),
+      email: email?.trim() || "",
+      address: address.trim(),
+      companyName: companyName?.trim() || "",
+      gstNumber: gstNumber?.trim().toUpperCase() || "",
+      openingBalance: balance,
+      notes: notes?.trim() || "",
+    });
+
+    res.status(201).json({
+      message: "Supplier added successfully.",
+      supplier,
+    });
+  } catch (error) {
+    console.error("Add supplier error:", error);
+    res.status(500).json({
+      message: "Failed to add supplier.",
+    });
+  }
+});
+
+// UPDATE a supplier
+app.put("/suppliers/:id", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: "Invalid supplier ID.",
+      });
+    }
+
+    const {
+      supplierName,
+      phone,
+      email,
+      address,
+      companyName,
+      gstNumber,
+      openingBalance,
+      notes,
+    } = req.body;
+
+    if (
+      !supplierName?.trim() ||
+      !phone?.trim() ||
+      !address?.trim()
+    ) {
+      return res.status(400).json({
+        message: "Supplier name, phone and address are required.",
+      });
+    }
+
+    const balance = Number(openingBalance ?? 0);
+
+    if (!Number.isFinite(balance) || balance < 0) {
+      return res.status(400).json({
+        message: "Opening balance must be zero or greater.",
+      });
+    }
+
+    const supplier = await Supplier.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        isActive: true,
+      },
+      {
+        $set: {
+          supplierName: supplierName.trim(),
+          phone: phone.trim(),
+          email: email?.trim() || "",
+          address: address.trim(),
+          companyName: companyName?.trim() || "",
+          gstNumber: gstNumber?.trim().toUpperCase() || "",
+          openingBalance: balance,
+          notes: notes?.trim() || "",
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!supplier) {
+      return res.status(404).json({
+        message: "Supplier not found.",
+      });
+    }
+
+    res.status(200).json({
+      message: "Supplier updated successfully.",
+      supplier,
+    });
+  } catch (error) {
+    console.error("Update supplier error:", error);
+    res.status(500).json({
+      message: "Failed to update supplier.",
+    });
+  }
+});
+
+// DEACTIVATE a supplier
+app.delete("/suppliers/:id", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: "Invalid supplier ID.",
+      });
+    }
+
+    const supplier = await Supplier.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        isActive: true,
+      },
+      {
+        $set: { isActive: false },
+      },
+      {
+        new: true,
+      }
+    );
+
+    if (!supplier) {
+      return res.status(404).json({
+        message: "Supplier not found.",
+      });
+    }
+
+    res.status(200).json({
+      message: "Supplier deactivated successfully.",
+    });
+  } catch (error) {
+    console.error("Deactivate supplier error:", error);
+    res.status(500).json({
+      message: "Failed to deactivate supplier.",
+    });
+  }
+});
+
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
