@@ -72,11 +72,11 @@ export default function Purchases() {
   useEffect(() => {
     fetchPurchases();
   }, []);
+const filtered = useMemo(() => {
+  const term = search.trim().toLowerCase();
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-
-    return purchases.filter((purchase) =>
+  return purchases
+    .filter((purchase) =>
       [
         purchase.purchaseNumber,
         purchase.supplierName,
@@ -85,8 +85,14 @@ export default function Purchases() {
       ].some((value) =>
         String(value || "").toLowerCase().includes(term)
       )
-    );
-  }, [purchases, search]);
+    )
+    .sort((a, b) => {
+      return (
+        new Date(a.createdAt || a.purchaseDate || 0).getTime() -
+        new Date(b.createdAt || b.purchaseDate || 0).getTime()
+      );
+    });
+}, [purchases, search]);
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const currentPage = Math.min(page, Math.max(totalPages, 1));

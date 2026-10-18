@@ -237,30 +237,34 @@ const openViewDrawer = (supplier) => {
     }
   };
 
-  // SEARCH SUPPLIERS
-  const filteredSuppliers = suppliers.filter((supplier) => {
-    const term = search.toLowerCase().trim();
+// SEARCH SUPPLIERS
+const filteredSuppliers = suppliers.filter((supplier) => {
+  const term = search.toLowerCase().trim();
 
-    return (
-      supplier.supplierName?.toLowerCase().includes(term) ||
-      supplier.companyName?.toLowerCase().includes(term) ||
-      supplier.phone?.toLowerCase().includes(term) ||
-      supplier.email?.toLowerCase().includes(term)
-    );
-  });
-
-  // PAGINATION
-  const totalPages = Math.ceil(
-    filteredSuppliers.length / itemsPerPage
+  return (
+    supplier.supplierName?.toLowerCase().includes(term) ||
+    supplier.companyName?.toLowerCase().includes(term) ||
+    supplier.phone?.toLowerCase().includes(term) ||
+    supplier.email?.toLowerCase().includes(term)
   );
+});
 
-  const startIndex = (currentPage - 1) * itemsPerPage;
+// SORT SUPPLIERS: OLDEST FIRST, NEWEST LAST
+const sortedSuppliers = [...filteredSuppliers].sort((a, b) => {
+  return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+});
 
-  const currentSuppliers = filteredSuppliers.slice(
-    startIndex,
-    startIndex + itemsPerPage
-  );
+// PAGINATION
+const totalPages = Math.ceil(
+  sortedSuppliers.length / itemsPerPage
+);
 
+const startIndex = (currentPage - 1) * itemsPerPage;
+
+const currentSuppliers = sortedSuppliers.slice(
+  startIndex,
+  startIndex + itemsPerPage
+);
   useEffect(() => {
     if (totalPages > 0 && currentPage > totalPages) {
       setCurrentPage(totalPages);

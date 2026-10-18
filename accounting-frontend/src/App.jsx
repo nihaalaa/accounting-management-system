@@ -23,6 +23,9 @@ import ViewCustomer from "./components/ViewCustomer";
 import Suppliers from "./components/Suppliers";
 import AddSupplier from "./components/AddSupplier";
 import Purchases from "./components/Purchases";
+import ViewPurchase from "./components/ViewPurchase";
+import AddPurchase from "./components/AddPurchase";
+import EditPurchase from "./components/EditPurchase";
 
 function App() {
    return (
@@ -55,6 +58,9 @@ function App() {
             <Route path="/invoices/view/:id" element={<ViewInvoice />} />
             <Route path="/invoices/edit/:id" element={<EditInvoice />} />
             <Route path="/purchases" element={<Purchases />}/>
+            <Route path="/purchases/add" element={<AddPurchase />} />
+            <Route path="/purchases/view/:id" element={<ViewPurchase />} />
+            <Route path="/purchases/edit/:id" element={<EditPurchase />} />
 
         </Routes>
       </div>
