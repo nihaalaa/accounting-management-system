@@ -4,7 +4,7 @@ import {
   Button,
   Card,
   Table,
-  Modal,
+  Offcanvas,
   Form,
   Row,
   Col,
@@ -20,9 +20,7 @@ import {
   BsEye,
   BsX,
 } from "react-icons/bs";
-
-// Same API URL pattern as the Customers page
-const API = `${import.meta.env.VITE_API_URL}/suppliers`;
+import { useNavigate } from "react-router-dom";
 
 const emptyForm = {
   supplierName: "",
@@ -36,13 +34,15 @@ const emptyForm = {
 };
 
 export const Suppliers = () => {
+  const navigate = useNavigate();
+
   const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState("add");
+  // Edit drawer state
+  const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [form, setForm] = useState({ ...emptyForm });
 
@@ -51,15 +51,17 @@ export const Suppliers = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Fetch suppliers from the backend
+  const [showViewDrawer, setShowViewDrawer] = useState(false);
+  // FETCH SUPPLIERS
   const fetchSuppliers = async () => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await axios.get(API);
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/suppliers`
+      );
 
-      // Accept either an array or { suppliers: [...] }
       const data = Array.isArray(response.data)
         ? response.data
         : response.data?.suppliers;
@@ -72,17 +74,13 @@ export const Suppliers = () => {
     } catch (err) {
       setSuppliers([]);
 
-      if (err.response?.status === 404) {
-        setError(
-          "Supplier API route not found. Add the /suppliers routes to your backend and redeploy it on Render."
-        );
-      } else {
-        setError(
-          err.response?.data?.message ||
-            err.message ||
-            "Failed to fetch suppliers."
-        );
-      }
+      setError(
+        err.response?.status === 404
+          ? "Supplier API route not found. Check your backend routes and Render deployment."
+          : err.response?.data?.message ||
+              err.message ||
+              "Failed to fetch suppliers."
+      );
     } finally {
       setLoading(false);
     }
@@ -92,25 +90,18 @@ export const Suppliers = () => {
     fetchSuppliers();
   }, []);
 
-  // Open Add modal
-  const openAddModal = () => {
-    setForm({ ...emptyForm });
-    setSelectedSupplier(null);
-    setModalType("add");
-    setError("");
-    setShowModal(true);
-  };
+// VIEW SUPPLIER: OPEN RIGHT-SIDE DRAWER
+const openViewDrawer = (supplier) => {
+  if (!supplier?._id) return;
 
-  // Open View modal
-  const openViewModal = (supplier) => {
-    setSelectedSupplier(supplier);
-    setModalType("view");
-    setError("");
-    setShowModal(true);
-  };
+  setSelectedSupplier(supplier);
+  setShowViewDrawer(true);
+};
 
-  // Open Edit modal
-  const openEditModal = (supplier) => {
+  // EDIT SUPPLIER: OPEN RIGHT-SIDE DRAWER
+  const openEditDrawer = (supplier) => {
+    if (!supplier?._id) return;
+
     setSelectedSupplier(supplier);
 
     setForm({
@@ -124,19 +115,22 @@ export const Suppliers = () => {
       notes: supplier.notes || "",
     });
 
-    setModalType("edit");
     setError("");
-    setShowModal(true);
+    setSuccess("");
+    setShowEditDrawer(true);
   };
 
-  const closeModal = () => {
+  // CLOSE EDIT DRAWER
+  const closeEditDrawer = () => {
     if (saving) return;
 
-    setShowModal(false);
+    setShowEditDrawer(false);
     setSelectedSupplier(null);
+    setForm({ ...emptyForm });
     setError("");
   };
 
+  // HANDLE FORM INPUTS
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -146,18 +140,26 @@ export const Suppliers = () => {
     }));
   };
 
-  // Add or update supplier
+  // UPDATE SUPPLIER
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setError("");
     setSuccess("");
+
+    if (!selectedSupplier?._id) {
+      setError("Please select a supplier to edit.");
+      return;
+    }
 
     if (
       !form.supplierName.trim() ||
       !form.phone.trim() ||
       !form.address.trim()
     ) {
-      setError("Supplier name, phone number and address are required.");
+      setError(
+        "Supplier name, phone number and address are required."
+      );
       return;
     }
 
@@ -182,21 +184,16 @@ export const Suppliers = () => {
     setSaving(true);
 
     try {
-      if (modalType === "edit") {
-        await axios.put(`${API}/${selectedSupplier._id}`, payload);
-      } else {
-        await axios.post(API, payload);
-      }
+      await axios.put(
+        `${import.meta.env.VITE_API_URL}/suppliers/${selectedSupplier._id}`,
+        payload
+      );
 
-      setShowModal(false);
+      setShowEditDrawer(false);
       setSelectedSupplier(null);
       setForm({ ...emptyForm });
 
-      setSuccess(
-        modalType === "edit"
-          ? "Supplier updated successfully."
-          : "Supplier added successfully."
-      );
+      setSuccess("Supplier updated successfully.");
 
       await fetchSuppliers();
     } catch (err) {
@@ -204,15 +201,15 @@ export const Suppliers = () => {
         err.response?.data?.message ||
           err.response?.data?.error ||
           (err.response?.status === 404
-            ? "Supplier API route not found. Check your backend routes and Render deployment."
-            : "Failed to save supplier.")
+            ? "Supplier update route not found. Check your backend."
+            : "Failed to update supplier.")
       );
     } finally {
       setSaving(false);
     }
   };
 
-  // Deactivate supplier rather than permanently removing history
+  // DELETE / DEACTIVATE SUPPLIER
   const handleDelete = async (supplier) => {
     const confirmed = window.confirm(
       `Deactivate supplier "${supplier.supplierName}"?`
@@ -224,7 +221,10 @@ export const Suppliers = () => {
     setSuccess("");
 
     try {
-      await axios.delete(`${API}/${supplier._id}`);
+      await axios.delete(
+        `${import.meta.env.VITE_API_URL}/suppliers/${supplier._id}`
+      );
+
       setSuccess("Supplier deactivated successfully.");
       await fetchSuppliers();
     } catch (err) {
@@ -237,7 +237,7 @@ export const Suppliers = () => {
     }
   };
 
-  // Search suppliers
+  // SEARCH SUPPLIERS
   const filteredSuppliers = suppliers.filter((supplier) => {
     const term = search.toLowerCase().trim();
 
@@ -249,6 +249,7 @@ export const Suppliers = () => {
     );
   });
 
+  // PAGINATION
   const totalPages = Math.ceil(
     filteredSuppliers.length / itemsPerPage
   );
@@ -268,6 +269,7 @@ export const Suppliers = () => {
     }
   }, [currentPage, totalPages]);
 
+  // EDIT FORM FIELDS
   const inputFields = [
     {
       name: "supplierName",
@@ -305,14 +307,9 @@ export const Suppliers = () => {
     },
   ];
 
-  const formatMoney = (amount) =>
-    `Rs. ${Number(amount || 0).toLocaleString("en-IN", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-
   return (
     <div style={pageStyle}>
+      {/* HEADER */}
       <div style={headerStyle}>
         <div>
           <h2 style={titleStyle}>Suppliers</h2>
@@ -321,15 +318,20 @@ export const Suppliers = () => {
           </p>
         </div>
 
-        <Button style={addButtonStyle} onClick={openAddModal}>
+        <Button
+          style={addButtonStyle}
+          onClick={() => navigate("/suppliers/add")}
+        >
           <BsPlus size={19} />
           Add Supplier
         </Button>
       </div>
 
+      {/* SUCCESS MESSAGE */}
       {success && (
         <div style={successStyle}>
           <span>{success}</span>
+
           <button
             type="button"
             onClick={() => setSuccess("")}
@@ -341,18 +343,21 @@ export const Suppliers = () => {
         </div>
       )}
 
-      {error && !showModal && (
+      {/* ERROR MESSAGE */}
+      {error && !showEditDrawer && (
         <div style={errorStyle}>
           {error}
+
           {error.includes("API route not found") && (
             <div style={{ marginTop: 6 }}>
-              Your frontend URL is already pointing to the suppliers
-              endpoint. The backend route must also exist and be deployed.
+              Make sure the supplier routes exist in your backend
+              and have been deployed to Render.
             </div>
           )}
         </div>
       )}
 
+      {/* SUPPLIER TABLE */}
       <Card style={cardStyle}>
         <div style={cardHeaderStyle}>
           <div>
@@ -365,6 +370,7 @@ export const Suppliers = () => {
           <div style={searchContainer}>
             <div style={searchBox}>
               <BsSearch size={15} color="#7b8794" />
+
               <input
                 type="text"
                 placeholder="Search suppliers..."
@@ -391,10 +397,23 @@ export const Suppliers = () => {
             <thead>
               <tr>
                 <th style={{ ...headerCell, width: "5%" }}>#</th>
-                <th style={{ ...headerCell, width: "22%" }}>SUPPLIER</th>
-                <th style={{ ...headerCell, width: "15%" }}>PHONE</th>
-                <th style={{ ...headerCell, width: "22%" }}>EMAIL</th>
-                <th style={{ ...headerCell, width: "20%" }}>ADDRESS</th>
+
+                <th style={{ ...headerCell, width: "22%" }}>
+                  SUPPLIER
+                </th>
+
+                <th style={{ ...headerCell, width: "15%" }}>
+                  PHONE
+                </th>
+
+                <th style={{ ...headerCell, width: "22%" }}>
+                  EMAIL
+                </th>
+
+                <th style={{ ...headerCell, width: "20%" }}>
+                  ADDRESS
+                </th>
+
                 <th
                   style={{
                     ...headerCell,
@@ -416,6 +435,7 @@ export const Suppliers = () => {
                       size="sm"
                       variant="secondary"
                     />
+
                     <div style={{ marginTop: 10 }}>
                       Loading suppliers...
                     </div>
@@ -433,10 +453,12 @@ export const Suppliers = () => {
                         <div style={supplierIcon}>
                           <BsBuilding size={17} />
                         </div>
+
                         <div style={{ minWidth: 0 }}>
                           <div style={supplierNameText}>
                             {supplier.supplierName}
                           </div>
+
                           <div style={supplierSubText}>
                             {supplier.companyName || "Supplier"}
                           </div>
@@ -444,9 +466,17 @@ export const Suppliers = () => {
                       </div>
                     </td>
 
-                    <td style={normalCell}>{supplier.phone || "-"}</td>
-                    <td style={normalCell}>{supplier.email || "-"}</td>
-                    <td style={normalCell}>{supplier.address || "-"}</td>
+                    <td style={normalCell}>
+                      {supplier.phone || "-"}
+                    </td>
+
+                    <td style={normalCell}>
+                      {supplier.email || "-"}
+                    </td>
+
+                    <td style={normalCell}>
+                      {supplier.address || "-"}
+                    </td>
 
                     <td
                       style={{
@@ -455,29 +485,35 @@ export const Suppliers = () => {
                       }}
                     >
                       <div style={actionContainer}>
+                        {/* VIEW PAGE */}
                         <Button
                           type="button"
                           title="View supplier"
+                          aria-label="View supplier"
                           size="sm"
-                          onClick={() => openViewModal(supplier)}
+onClick={() => openViewDrawer(supplier)}
                           style={viewButtonStyle}
                         >
                           <BsEye size={13} />
                         </Button>
 
+                        {/* EDIT DRAWER */}
                         <Button
                           type="button"
                           title="Edit supplier"
+                          aria-label="Edit supplier"
                           size="sm"
-                          onClick={() => openEditModal(supplier)}
+                          onClick={() => openEditDrawer(supplier)}
                           style={editButtonStyle}
                         >
                           <BsPencil size={13} />
                         </Button>
 
+                        {/* DEACTIVATE */}
                         <Button
                           type="button"
                           title="Deactivate supplier"
+                          aria-label="Deactivate supplier"
                           size="sm"
                           onClick={() => handleDelete(supplier)}
                           style={deleteButtonStyle}
@@ -494,6 +530,7 @@ export const Suppliers = () => {
                     <div style={emptyIcon}>
                       <BsBuilding size={25} />
                     </div>
+
                     <div style={emptyTitle}>
                       {search
                         ? "No suppliers found"
@@ -501,6 +538,7 @@ export const Suppliers = () => {
                         ? "Unable to load suppliers"
                         : "No suppliers available"}
                     </div>
+
                     <div style={emptyText}>
                       {search
                         ? `No suppliers match "${search}".`
@@ -513,7 +551,10 @@ export const Suppliers = () => {
                       <Button
                         type="button"
                         variant="light"
-                        style={{ ...cancelButtonStyle, marginTop: 12 }}
+                        style={{
+                          ...cancelButtonStyle,
+                          marginTop: 12,
+                        }}
                         onClick={fetchSuppliers}
                       >
                         Retry
@@ -526,6 +567,7 @@ export const Suppliers = () => {
           </Table>
         </Card.Body>
 
+        {/* PAGINATION */}
         {totalPages > 1 && (
           <div style={paginationStyle}>
             <button
@@ -535,6 +577,8 @@ export const Suppliers = () => {
               style={{
                 ...paginationButtonStyle,
                 opacity: currentPage === 1 ? 0.5 : 1,
+                cursor:
+                  currentPage === 1 ? "not-allowed" : "pointer",
               }}
             >
               Previous
@@ -568,7 +612,12 @@ export const Suppliers = () => {
               onClick={() => setCurrentPage((p) => p + 1)}
               style={{
                 ...paginationButtonStyle,
-                opacity: currentPage === totalPages ? 0.5 : 1,
+                opacity:
+                  currentPage === totalPages ? 0.5 : 1,
+                cursor:
+                  currentPage === totalPages
+                    ? "not-allowed"
+                    : "pointer",
               }}
             >
               Next
@@ -577,193 +626,482 @@ export const Suppliers = () => {
         )}
       </Card>
 
-      {/* ADD / EDIT / VIEW MODAL */}
-      <Modal
-        show={showModal}
-        onHide={closeModal}
-        centered
-        size="lg"
-        backdrop={saving ? "static" : true}
-        keyboard={!saving}
+      {/* EDIT SUPPLIER — RIGHT-SIDE OFFCANVAS */}
+<Offcanvas
+  show={showEditDrawer}
+  onHide={() => {
+    if (!saving) closeEditDrawer();
+  }}
+  placement="end"
+  backdrop="static"
+  keyboard={!saving}
+  scroll={false}
+style={{
+  width: "calc(100% - 250px)",
+  height: "100dvh",
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+  borderLeft: "1px solid #e2e8f0",
+  boxShadow: "-8px 0 30px rgba(15, 27, 45, 0.10)",
+  marginLeft: "250px",
+  boxSizing: "border-box",
+}}
       >
-        <Form onSubmit={handleSubmit}>
-          <Modal.Header
-            closeButton={!saving}
-            style={modalHeaderStyle}
-          >
+        {/* HEADER */}
+        <Offcanvas.Header style={drawerHeaderStyle}>
+          <div style={drawerHeadingContainer}>
+            <div style={drawerHeadingIcon }>
+              <BsPencil size={18} />
+            </div>
+
             <div>
-              <Modal.Title style={modalTitleStyle}>
-                {modalType === "add"
-                  ? "Add New Supplier"
-                  : modalType === "edit"
-                  ? "Edit Supplier"
-                  : "Supplier Details"}
-              </Modal.Title>
+              <Offcanvas.Title style={modalTitleStyle}>
+                Edit Supplier
+              </Offcanvas.Title>
+
               <div style={modalSubtitleStyle}>
-                {modalType === "view"
-                  ? "Supplier contact and account information"
-                  : "Fields marked with * are required"}
+                Update supplier details and account information
               </div>
             </div>
-          </Modal.Header>
+          </div>
 
-          <Modal.Body style={{ padding: 24 }}>
-            {error && <div style={errorStyle}>{error}</div>}
+          <button
+            type="button"
+            onClick={closeEditDrawer}
+            disabled={saving}
+            aria-label="Close edit supplier"
+            style={drawerCloseButton}
+          >
+            <BsX size={22} />
+          </button>
+        </Offcanvas.Header>
 
-            {modalType === "view" && selectedSupplier ? (
-              <>
-                <div style={detailBanner}>
-                  <div style={detailIcon}>
-                    <BsBuilding size={24} />
-                  </div>
-                  <div>
-                    <div style={detailName}>
-                      {selectedSupplier.supplierName}
-                    </div>
-                    <div style={supplierSubText}>
-                      {selectedSupplier.companyName || "Supplier"}
-                    </div>
-                  </div>
+        {/* FORM */}
+        <Form onSubmit={handleSubmit} style={drawerFormStyle}>
+          <Offcanvas.Body style={drawerBodyStyle}>
+            {error && (
+              <div style={errorStyle}>
+                {error}
+              </div>
+            )}
+
+            {/* SUPPLIER INFORMATION */}
+            <div style={formSectionStyle}>
+              <div style={sectionHeadingStyle}>
+                <div style={sectionTitleStyle}>
+                  Supplier Information
                 </div>
 
-                <Row className="g-3 mt-1">
-                  {[
-                    ["Phone Number", selectedSupplier.phone],
-                    ["Email Address", selectedSupplier.email],
-                    ["Company Name", selectedSupplier.companyName],
-                    ["GST Number", selectedSupplier.gstNumber],
-                    ["Address", selectedSupplier.address],
-                    [
-                      "Opening Balance",
-                      formatMoney(selectedSupplier.openingBalance),
-                    ],
-                    ["Notes", selectedSupplier.notes],
-                  ].map(([label, value]) => (
-                    <Col md={6} key={label}>
-                      <div style={detailBox}>
-                        <div style={detailLabel}>{label}</div>
-                        <div style={detailValue}>{value || "-"}</div>
-                      </div>
+                <div style={sectionDescriptionStyle}>
+                  Basic contact and business details
+                </div>
+              </div>
+
+              <Row className="g-3">
+                {inputFields
+                  .filter((field) =>
+                    ["supplierName", "phone", "email", "companyName"].includes(
+                      field.name
+                    )
+                  )
+                  .map((field) => (
+                    <Col xs={12} key={field.name}>
+                      <Form.Group controlId={`supplier-${field.name}`}>
+                        <Form.Label style={formLabelStyle}>
+                          {field.label}
+                          {/* {field.required && (
+                            <span style={{ color: "#dc2626" }}> *</span>
+                          )} */}
+                        </Form.Label>
+
+                        <Form.Control
+                          type={field.type || "text"}
+                          name={field.name}
+                          value={form[field.name] ?? ""}
+                          onChange={handleChange}
+                          placeholder={field.placeholder}
+                          required={Boolean(field.required)}
+                          style={formInputStyle}
+                          autoComplete={
+                            field.name === "email"
+                              ? "email"
+                              : field.name === "phone"
+                              ? "tel"
+                              : "off"
+                          }
+                        />
+                      </Form.Group>
                     </Col>
                   ))}
-                </Row>
-              </>
-            ) : (
+              </Row>
+            </div>
+
+            {/* ADDRESS AND TAX DETAILS */}
+            <div style={formSectionStyle}>
+              <div style={sectionHeadingStyle}>
+                <div style={sectionTitleStyle}>
+                  Address & Tax Details
+                </div>
+
+                <div style={sectionDescriptionStyle}>
+                  Business address and GST registration
+                </div>
+              </div>
+
               <Row className="g-3">
-                {inputFields.map((field) => (
-                  <Col md={6} key={field.name}>
-                    <Form.Group controlId={`supplier-${field.name}`}>
-                      <Form.Label style={formLabelStyle}>
-                        {field.label}
-                        {field.required && (
-                          <span style={{ color: "#dc2626" }}> *</span>
-                        )}
-                      </Form.Label>
-
-                      <Form.Control
-                        type={field.type || "text"}
-                        name={field.name}
-                        value={form[field.name]}
-                        onChange={handleChange}
-                        placeholder={field.placeholder}
-                        required={field.required || false}
-                        min={
-                          field.name === "openingBalance" ? "0" : undefined
-                        }
-                        step={
-                          field.name === "openingBalance" ? "0.01" : undefined
-                        }
-                        style={formInputStyle}
-                      />
-                    </Form.Group>
-                  </Col>
-                ))}
-
-                <Col md={12}>
+                <Col xs={12}>
                   <Form.Group controlId="supplier-address">
                     <Form.Label style={formLabelStyle}>
-                      Address <span style={{ color: "#dc2626" }}>*</span>
+                      Address 
+                      {/* <span style={{ color: "#dc2626" }}>*</span> */}
                     </Form.Label>
+
                     <Form.Control
                       as="textarea"
-                      rows={2}
+                      rows={3}
                       name="address"
-                      value={form.address}
+                      value={form.address ?? ""}
                       onChange={handleChange}
-                      placeholder="Enter complete address"
+                      placeholder="Enter complete business address"
                       required
-                      style={formInputStyle}
+                      style={{
+                        ...formInputStyle,
+                        resize: "vertical",
+                        minHeight: 90,
+                      }}
                     />
                   </Form.Group>
                 </Col>
 
-                <Col md={12}>
-                  <Form.Group controlId="supplier-notes">
-                    <Form.Label style={formLabelStyle}>Notes</Form.Label>
+                <Col xs={12}>
+                  <Form.Group controlId="supplier-gstNumber">
+                    <Form.Label style={formLabelStyle}>
+                      GST Number
+                    </Form.Label>
+
                     <Form.Control
-                      as="textarea"
-                      rows={2}
-                      name="notes"
-                      value={form.notes}
+                      type="text"
+                      name="gstNumber"
+                      value={form.gstNumber ?? ""}
                       onChange={handleChange}
-                      placeholder="Additional information (optional)"
-                      style={formInputStyle}
+                      placeholder="Enter GST identification number"
+                      style={{
+                        ...formInputStyle,
+                        textTransform: "uppercase",
+                      }}
                     />
                   </Form.Group>
                 </Col>
               </Row>
-            )}
-          </Modal.Body>
+            </div>
 
-          <Modal.Footer style={modalFooterStyle}>
-            <Button
-              type="button"
-              variant="light"
-              onClick={closeModal}
-              disabled={saving}
-              style={cancelButtonStyle}
-            >
-              {modalType === "view" ? "Close" : "Cancel"}
-            </Button>
+            {/* ACCOUNT DETAILS */}
+            <div style={formSectionStyle}>
+              <div style={sectionHeadingStyle}>
+                <div style={sectionTitleStyle}>
+                  Account Details
+                </div>
 
-            {modalType === "view" ? (
+                <div style={sectionDescriptionStyle}>
+                  Opening balance and additional notes
+                </div>
+              </div>
+
+              <Row className="g-3">
+                <Col xs={12}>
+                  <Form.Group controlId="supplier-openingBalance">
+                    <Form.Label style={formLabelStyle}>
+                      Opening Balance (Rs.)
+                    </Form.Label>
+
+                    <Form.Control
+                      type="number"
+                      name="openingBalance"
+                      value={form.openingBalance ?? "0"}
+                      onChange={handleChange}
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                      style={formInputStyle}
+                    />
+
+                    <Form.Text style={helperTextStyle}>
+                      Enter the existing amount payable to this supplier, if any.
+                    </Form.Text>
+                  </Form.Group>
+                </Col>
+
+                <Col xs={12}>
+                  <Form.Group controlId="supplier-notes">
+                    <Form.Label style={formLabelStyle}>
+                      Notes <span style={optionalLabelStyle}>(Optional)</span>
+                    </Form.Label>
+
+                    <Form.Control
+                      as="textarea"
+                      rows={3}
+                      name="notes"
+                      value={form.notes ?? ""}
+                      onChange={handleChange}
+                      placeholder="Add any additional supplier information..."
+                      style={{
+                        ...formInputStyle,
+                        resize: "vertical",
+                      }}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+            </div>
+          </Offcanvas.Body>
+
+          {/* FIXED FOOTER */}
+          <div style={drawerFooterStyle}>
+            <div style={footerHintStyle}>
+              {/* <span style={{ color: "#dc2626" }}>*</span> Required fields */}
+            </div>
+
+            <div style={footerActionsStyle}>
               <Button
                 type="button"
-                style={addButtonStyle}
-                onClick={() => openEditModal(selectedSupplier)}
+                onClick={closeEditDrawer}
+                disabled={saving}
+                style={cancelButtonStyle}
               >
-                <BsPencil size={14} /> Edit Supplier
+                Cancel
               </Button>
-            ) : (
+
               <Button
                 type="submit"
                 disabled={saving}
-                style={addButtonStyle}
+                style={saveButtonStyle}
               >
                 {saving ? (
                   <>
-                    <Spinner size="sm" animation="border" /> Saving...
+                    <Spinner size="sm" animation="border" />
+                    <span>Saving...</span>
                   </>
                 ) : (
                   <>
-                    <BsPlus size={18} />
-                    {modalType === "edit"
-                      ? "Save Changes"
-                      : "Add Supplier"}
+                    <BsPencil size={14} />
+                    <span>Save Changes</span>
                   </>
                 )}
               </Button>
-            )}
-          </Modal.Footer>
+            </div>
+          </div>
         </Form>
-      </Modal>
+      </Offcanvas>
+      
+{/* VIEW SUPPLIER — RIGHT-SIDE OFFCANVAS */}
+<Offcanvas
+  show={showViewDrawer}
+  onHide={() => setShowViewDrawer(false)}
+  placement="end"
+  scroll={false}
+  style={{
+    width: "calc(100% - 250px)",
+    height: "100dvh",
+    marginLeft: "250px",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    boxSizing: "border-box",
+    borderLeft: "1px solid #e2e8f0",
+    boxShadow: "-8px 0 30px rgba(15, 27, 45, 0.10)",
+  }}
+>
+  {/* HEADER */}
+  <Offcanvas.Header style={drawerHeaderStyle}>
+    <div style={drawerHeadingContainer}>
+      <div style={drawerHeadingIcon}>
+        <BsBuilding size={18} />
+      </div>
+
+      <div>
+        <Offcanvas.Title style={modalTitleStyle}>
+          Supplier Details
+        </Offcanvas.Title>
+
+        <div style={modalSubtitleStyle}>
+          View supplier contact and account information
+        </div>
+      </div>
     </div>
+
+    <button
+      type="button"
+      onClick={() => setShowViewDrawer(false)}
+      aria-label="Close supplier details"
+      style={drawerCloseButton}
+    >
+      <BsX size={22} />
+    </button>
+  </Offcanvas.Header>
+
+  {/* DETAILS BODY */}
+  <Offcanvas.Body style={drawerBodyStyle}>
+    {selectedSupplier && (
+      <>
+        {/* SUPPLIER PROFILE */}
+        <div style={viewProfileStyle}>
+          <div style={viewProfileIconStyle}>
+            <BsBuilding size={25} />
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            <h5 style={viewSupplierNameStyle}>
+              {selectedSupplier.supplierName || "Unnamed Supplier"}
+            </h5>
+
+            <p style={viewCompanyNameStyle}>
+              {selectedSupplier.companyName || "Independent Supplier"}
+            </p>
+          </div>
+        </div>
+
+        {/* SUPPLIER INFORMATION */}
+        <div style={formSectionStyle}>
+          <div style={sectionHeadingStyle}>
+            <div style={sectionTitleStyle}>
+              Supplier Information
+            </div>
+            <div style={sectionDescriptionStyle}>
+              Basic contact and business details
+            </div>
+          </div>
+
+          <Row className="g-3">
+            <Col xs={12} md={6}>
+              <ViewDetail
+                label="Supplier Name"
+                value={selectedSupplier.supplierName}
+              />
+            </Col>
+
+            <Col xs={12} md={6}>
+              <ViewDetail
+                label="Phone Number"
+                value={selectedSupplier.phone}
+              />
+            </Col>
+
+            <Col xs={12} md={6}>
+              <ViewDetail
+                label="Email Address"
+                value={selectedSupplier.email}
+              />
+            </Col>
+
+            <Col xs={12} md={6}>
+              <ViewDetail
+                label="Company Name"
+                value={selectedSupplier.companyName}
+              />
+            </Col>
+          </Row>
+        </div>
+
+        {/* ADDRESS AND TAX */}
+        <div style={formSectionStyle}>
+          <div style={sectionHeadingStyle}>
+            <div style={sectionTitleStyle}>
+              Address & Tax Details
+            </div>
+            <div style={sectionDescriptionStyle}>
+              Business address and GST registration
+            </div>
+          </div>
+
+          <Row className="g-3">
+            <Col xs={12}>
+              <ViewDetail
+                label="Business Address"
+                value={selectedSupplier.address}
+              />
+            </Col>
+
+            <Col xs={12}>
+              <ViewDetail
+                label="GST Number"
+                value={selectedSupplier.gstNumber}
+              />
+            </Col>
+          </Row>
+        </div>
+
+        {/* ACCOUNT DETAILS */}
+        <div style={formSectionStyle}>
+          <div style={sectionHeadingStyle}>
+            <div style={sectionTitleStyle}>
+              Account Details
+            </div>
+            <div style={sectionDescriptionStyle}>
+              Opening balance and additional notes
+            </div>
+          </div>
+
+          <Row className="g-3">
+            <Col xs={12} md={6}>
+              <ViewDetail
+                label="Opening Balance"
+                value={`Rs. ${Number(
+                  selectedSupplier.openingBalance ?? 0
+                ).toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`}
+              />
+            </Col>
+
+            <Col xs={12}>
+              <ViewDetail
+                label="Notes"
+                value={selectedSupplier.notes}
+              />
+            </Col>
+          </Row>
+        </div>
+      </>
+    )}
+  </Offcanvas.Body>
+
+  {/* FOOTER */}
+  <div style={drawerFooterStyle}>
+    <div style={footerActionsStyle}>
+      <Button
+        type="button"
+        onClick={() => setShowViewDrawer(false)}
+        style={cancelButtonStyle}
+      >
+        Close
+      </Button>
+    </div>
+  </div>
+</Offcanvas>
+
+    </div>
+    
   );
 };
 
+const ViewDetail = ({ label, value }) => (
+  <div style={viewDetailBoxStyle}>
+    <div style={viewDetailLabelStyle}>{label}</div>
+    <div style={viewDetailValueStyle}>
+      {value !== undefined && value !== null && String(value).trim() !== ""
+        ? value
+        : "—"}
+    </div>
+  </div>
+);
+
 export default Suppliers;
 
-/* PAGE STYLES */
+// =========================
+// INLINE STYLES
+// =========================
 
 const pageStyle = {
   padding: "30px 35px",
@@ -909,7 +1247,10 @@ const normalCell = {
   whiteSpace: "nowrap",
 };
 
-const numberCell = { ...normalCell, color: "#9ca3af" };
+const numberCell = {
+  ...normalCell,
+  color: "#9ca3af",
+};
 
 const supplierContainer = {
   display: "flex",
@@ -1051,104 +1392,192 @@ const pageNumberStyle = {
   cursor: "pointer",
 };
 
-const modalHeaderStyle = {
-  padding: "20px 24px",
-  borderBottom: "1px solid #e5e7eb",
-  backgroundColor: "#ffffff",
-};
-
-const modalTitleStyle = {
-  fontSize: 18,
-  fontWeight: 600,
-  color: "#26384a",
-};
-
-const modalSubtitleStyle = {
-  marginTop: 5,
-  fontSize: 12,
-  color: "#89939e",
-};
-
-const modalFooterStyle = {
-  padding: "15px 24px",
-  borderTop: "1px solid #e5e7eb",
-  backgroundColor: "#fafbfc",
-};
-
-const formLabelStyle = {
-  color: "#4b5563",
-  fontSize: 12,
-  fontWeight: 600,
-  marginBottom: 7,
-};
-
-const formInputStyle = {
-  border: "1px solid #d7dde4",
-  borderRadius: 6,
-  fontSize: 13,
-  padding: "10px 12px",
-  boxShadow: "none",
-};
-
-const cancelButtonStyle = {
-  border: "1px solid #d1d5db",
-  backgroundColor: "#ffffff",
-  color: "#4b5563",
-  borderRadius: 6,
-  padding: "9px 16px",
-  fontSize: 12,
-};
-
-const detailBanner = {
+const drawerHeaderStyle = {
+  flexShrink: 0,
   display: "flex",
   alignItems: "center",
-  gap: 14,
-  padding: 18,
-  backgroundColor: "#f4f7fa",
-  border: "1px solid #e5eaf0",
-  borderRadius: 9,
+  justifyContent: "space-between",
+  gap: 12,
+  padding: "20px 24px",
+  borderBottom: "1px solid #e5eaf0",
+  backgroundColor: "#ffffff",
 };
 
-const detailIcon = {
-  width: 48,
-  height: 48,
+const drawerHeadingContainer = {
+  display: "flex",
+  alignItems: "center",
+  gap: 13,
+  minWidth: 0,
+};
+
+const drawerHeadingIcon = {
+  width: 42,
+  height: 42,
+  minWidth: 42,
   borderRadius: 10,
-  backgroundColor: "#e4edf5",
+  backgroundColor: "#edf3f8",
   color: "#3f607d",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
 };
 
-const detailName = {
-  fontSize: 16,
-  fontWeight: 600,
-  color: "#26384a",
-};
-
-const detailBox = {
-  padding: "12px 14px",
-  border: "1px solid #e5eaf0",
+const drawerCloseButton = {
+  width: 34,
+  height: 34,
+  minWidth: 34,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  border: "1px solid #e2e8f0",
   borderRadius: 7,
-  minHeight: 66,
-  overflowWrap: "anywhere",
+  backgroundColor: "#ffffff",
+  color: "#64748b",
+  cursor: "pointer",
 };
 
-const detailLabel = {
-  fontSize: 10,
+const modalTitleStyle = {
+  margin: 0,
+  fontSize: 18,
+  lineHeight: 1.4,
+  fontWeight: 650,
+  color: "#1e293b",
+};
+
+const modalSubtitleStyle = {
+  marginTop: 4,
+  fontSize: 11,
+  lineHeight: 1.5,
+  color: "#8793a2",
+};
+const drawerFormStyle = {
+  display: "flex",
+  flexDirection: "column",
+  flex: "1 1 auto",
+  minHeight: 0,
+  overflow: "hidden",
+  backgroundColor: "#ffffff",
+};
+
+const drawerBodyStyle = {
+  flex: "1 1 auto",
+  minHeight: 0,
+  minWidth: 0,
+  overflowY: "auto",
+  overflowX: "hidden",
+  padding: "22px 24px 28px",
+  backgroundColor: "#ffffff",
+  boxSizing: "border-box",
+};
+
+const formSectionStyle = {
+  marginBottom: 27,
+};
+
+const sectionHeadingStyle = {
+  marginBottom: 17,
+  paddingBottom: 11,
+  borderBottom: "1px solid #edf0f4",
+};
+
+const sectionTitleStyle = {
+  fontSize: 13,
+  fontWeight: 650,
+  color: "#27384a",
+  marginBottom: 4,
+};
+
+const sectionDescriptionStyle = {
+  fontSize: 11,
+  color: "#94a0ad",
+  lineHeight: 1.5,
+};
+
+const formLabelStyle = {
+  display: "block",
+  color: "#465466",
+  fontSize: 12,
   fontWeight: 600,
-  textTransform: "uppercase",
-  letterSpacing: "0.4px",
-  color: "#89939e",
   marginBottom: 7,
 };
 
-const detailValue = {
-  fontSize: 13,
-  color: "#374151",
-  whiteSpace: "pre-wrap",
+const formInputStyle = {
+  width: "100%",
+  minHeight: 42,
+  border: "1px solid #dce3eb",
+  borderRadius: 7,
+  fontSize: 12,
+  padding: "10px 12px",
+  color: "#334155",
+  backgroundColor: "#ffffff",
+  boxShadow: "none",
+  transition: "border-color 0.15s ease",
 };
 
+const helperTextStyle = {
+  display: "block",
+  marginTop: 7,
+  fontSize: 10,
+  lineHeight: 1.6,
+  color: "#8995a4",
+};
+
+const optionalLabelStyle = {
+  fontSize: 10,
+  fontWeight: 400,
+  color: "#94a3b8",
+};
+
+const drawerFooterStyle = {
+  flexShrink: 0,
+  position: "relative",
+  zIndex: 2,
+  padding: "15px 24px",
+  borderTop: "1px solid #e5eaf0",
+  backgroundColor: "#ffffff",
+  boxShadow: "0 -4px 12px rgba(15, 27, 45, 0.025)",
+};
+const footerHintStyle = {
+  fontSize: 10,
+  color: "#94a3b8",
+  marginBottom: 12,
+};
+
+const footerActionsStyle = {
+  display: "flex",
+  justifyContent: "flex-end",
+  alignItems: "center",
+  gap: 10,
+};
+
+const cancelButtonStyle = {
+  border: "1px solid #d8e0e8",
+  backgroundColor: "#ffffff",
+  color: "#475569",
+  borderRadius: 7,
+  padding: "10px 17px",
+  minHeight: 39,
+  fontSize: 12,
+  fontWeight: 500,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const saveButtonStyle = {
+  border: "1px solid #3f607d",
+  backgroundColor: "#3f607d",
+  color: "#ffffff",
+  borderRadius: 7,
+  padding: "10px 17px",
+  minHeight: 39,
+  fontSize: 12,
+  fontWeight: 600,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+};
 const successStyle = {
   display: "flex",
   alignItems: "center",
@@ -1179,4 +1608,66 @@ const errorStyle = {
   padding: "10px 12px",
   fontSize: 12,
   marginBottom: 14,
+};
+
+const viewProfileStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 15,
+  padding: "20px",
+  marginBottom: 28,
+  border: "1px solid #e5eaf0",
+  borderRadius: 10,
+  backgroundColor: "#f8fafc",
+};
+
+const viewProfileIconStyle = {
+  width: 54,
+  height: 54,
+  minWidth: 54,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 12,
+  backgroundColor: "#edf3f8",
+  color: "#3f607d",
+};
+
+const viewSupplierNameStyle = {
+  margin: 0,
+  fontSize: 17,
+  fontWeight: 650,
+  color: "#1e293b",
+  overflowWrap: "anywhere",
+};
+
+const viewCompanyNameStyle = {
+  margin: "5px 0 0",
+  fontSize: 12,
+  color: "#8793a2",
+};
+
+const viewDetailBoxStyle = {
+  height: "100%",
+  minHeight: 70,
+  padding: "13px 15px",
+  border: "1px solid #e5eaf0",
+  borderRadius: 8,
+  backgroundColor: "#ffffff",
+  overflowWrap: "anywhere",
+};
+
+const viewDetailLabelStyle = {
+  marginBottom: 7,
+  fontSize: 11,
+  fontWeight: 600,
+  color: "#8793a2",
+};
+
+const viewDetailValueStyle = {
+  fontSize: 13,
+  fontWeight: 500,
+  lineHeight: 1.6,
+  color: "#334155",
+  whiteSpace: "pre-wrap",
 };

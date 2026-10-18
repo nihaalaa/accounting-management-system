@@ -21,6 +21,8 @@ import { EditInvoice } from "./components/EditInvoice";
 import Dashboard from "./components/Dashboard";
 import ViewCustomer from "./components/ViewCustomer";
 import Suppliers from "./components/Suppliers";
+import AddSupplier from "./components/AddSupplier";
+import Purchases from "./components/Purchases";
 
 function App() {
    return (
@@ -43,15 +45,17 @@ function App() {
             <Route path='/customers/edit/:id' element={<EditCustomers />}/>
             <Route path='/customers/view/:id' element={<ViewCustomer />} />
             <Route path="/suppliers" element={<Suppliers />} />
-<Route path="/expenses/add" element={<AddExpense />} />
-<Route
-  path="/expenses/edit/:id"
-  element={<EditExpense />}
-/>
-<Route path="/invoices" element={<Invoices />} />
-<Route path="/invoices/add" element={<AddInvoice />} />
-<Route path="/invoices/view/:id" element={<ViewInvoice />} />
-<Route path="/invoices/edit/:id" element={<EditInvoice />} />
+            <Route path="/suppliers/add" element={<AddSupplier />} />
+            <Route path="/purchases" element={<Purchases />} />
+
+            <Route path="/expenses/add" element={<AddExpense />} />
+            <Route path="/expenses/edit/:id" element={<EditExpense />}/>
+            <Route path="/invoices" element={<Invoices />} />
+            <Route path="/invoices/add" element={<AddInvoice />} />
+            <Route path="/invoices/view/:id" element={<ViewInvoice />} />
+            <Route path="/invoices/edit/:id" element={<EditInvoice />} />
+            <Route path="/purchases" element={<Purchases />}/>
+
         </Routes>
       </div>
     </div></BrowserRouter>

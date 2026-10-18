@@ -15,6 +15,7 @@ const Customer = require("./models/Customer")
 const Invoice = require("./models/Invoice");
 const Counter = require("./models/Counter");
 const Supplier = require("./models/Supplier");
+const Purchase = require("./models/Purchase");
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("mongodb connected"))
@@ -908,6 +909,395 @@ app.delete("/suppliers/:id", async (req, res) => {
   }
 });
 
+
+/* =========================
+   PURCHASE ROUTES
+========================= */
+
+// Calculate purchase details and validate supplier/products.
+async function preparePurchaseData(data) {
+  const {
+    supplierId,
+    purchaseDate,
+    items,
+    amountPaid = 0,
+    notes = "",
+  } = data;
+
+  if (
+    !supplierId ||
+    !mongoose.Types.ObjectId.isValid(supplierId)
+  ) {
+    throw new Error("Please select a valid supplier.");
+  }
+
+  const supplier = await Supplier.findOne({
+    _id: supplierId,
+    isActive: true,
+  });
+
+  if (!supplier) {
+    throw new Error("Supplier not found or inactive.");
+  }
+
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error("Add at least one product.");
+  }
+
+  const preparedItems = [];
+
+  for (const item of items) {
+    const productId = item.productId;
+
+    if (
+      !productId ||
+      !mongoose.Types.ObjectId.isValid(productId)
+    ) {
+      throw new Error("Please select a valid product.");
+    }
+
+    const quantity = Number(item.quantity);
+
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new Error("Product quantity must be a positive whole number.");
+    }
+
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      throw new Error(`Product not found: ${productId}`);
+    }
+
+    const purchasePrice =
+      item.purchasePrice === undefined ||
+      item.purchasePrice === ""
+        ? Number(product.purchasePrice)
+        : Number(item.purchasePrice);
+
+    if (!Number.isFinite(purchasePrice) || purchasePrice < 0) {
+      throw new Error(
+        `Invalid purchase price for ${product.name}.`
+      );
+    }
+
+    preparedItems.push({
+      productId: product._id,
+      productName: product.name,
+      productCode: product.code,
+      quantity,
+      purchasePrice,
+      total: Number((quantity * purchasePrice).toFixed(2)),
+    });
+  }
+
+  const grandTotal = Number(
+    preparedItems
+      .reduce((sum, item) => sum + item.total, 0)
+      .toFixed(2)
+  );
+
+  const paid = Number(amountPaid);
+
+  if (
+    !Number.isFinite(paid) ||
+    paid < 0 ||
+    paid > grandTotal
+  ) {
+    throw new Error(
+      "Amount paid must be between zero and the purchase total."
+    );
+  }
+
+  const paymentStatus =
+    paid === grandTotal
+      ? "Paid"
+      : paid > 0
+        ? "Partially Paid"
+        : "Unpaid";
+
+  const parsedDate = purchaseDate
+    ? new Date(purchaseDate)
+    : new Date();
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    throw new Error("Invalid purchase date.");
+  }
+
+  return {
+    supplierId: supplier._id,
+    supplierName: supplier.supplierName,
+    purchaseDate: parsedDate,
+    items: preparedItems,
+    grandTotal,
+    amountPaid: paid,
+    paymentStatus,
+    notes: String(notes || "").trim(),
+  };
+}
+
+// Return the net stock change for each product.
+function getStockDeltas(newItems, oldItems = []) {
+  const deltas = new Map();
+
+  for (const item of oldItems) {
+    const id = String(item.productId);
+    deltas.set(
+      id,
+      (deltas.get(id) || 0) - Number(item.quantity)
+    );
+  }
+
+  for (const item of newItems) {
+    const id = String(item.productId);
+    deltas.set(
+      id,
+      (deltas.get(id) || 0) + Number(item.quantity)
+    );
+  }
+
+  return deltas;
+}
+
+// Apply stock changes. Reverse already-applied changes if one fails.
+async function applyPurchaseStockChanges(deltas) {
+  const applied = [];
+
+  try {
+    for (const [productId, delta] of deltas) {
+      if (delta === 0) continue;
+
+      const filter = { _id: productId };
+
+      // Never let stock become negative.
+      if (delta < 0) {
+        filter.currentStock = { $gte: Math.abs(delta) };
+      }
+
+      const result = await Product.updateOne(
+        filter,
+        { $inc: { currentStock: delta } }
+      );
+
+      if (result.matchedCount !== 1) {
+        throw new Error(
+          delta < 0
+            ? `Cannot remove ${Math.abs(delta)} units from product ${productId}. Stock may already have been sold.`
+            : `Product not found: ${productId}`
+        );
+      }
+
+      applied.push({ productId, delta });
+    }
+  } catch (error) {
+    // Best-effort rollback of changes from this operation.
+    for (const change of applied.reverse()) {
+      try {
+        await Product.updateOne(
+          { _id: change.productId },
+          { $inc: { currentStock: -change.delta } }
+        );
+      } catch (rollbackError) {
+        console.error("Purchase stock rollback error:", rollbackError);
+      }
+    }
+
+    throw error;
+  }
+}
+
+// GET ALL PURCHASES
+app.get("/purchases", async (req, res) => {
+  try {
+    const purchases = await Purchase.find()
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(purchases);
+  } catch (error) {
+    console.error("Fetch purchases error:", error);
+    res.status(500).json({
+      message: "Failed to fetch purchases.",
+      error: error.message,
+    });
+  }
+});
+
+// GET ONE PURCHASE
+app.get("/purchases/:id", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: "Invalid purchase ID.",
+      });
+    }
+
+    const purchase = await Purchase.findById(req.params.id);
+
+    if (!purchase) {
+      return res.status(404).json({
+        message: "Purchase not found.",
+      });
+    }
+
+    res.status(200).json(purchase);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch purchase.",
+      error: error.message,
+    });
+  }
+});
+
+// ADD PURCHASE
+app.post("/purchases", async (req, res) => {
+  let stockDeltas;
+
+  try {
+    const purchaseData = await preparePurchaseData(req.body);
+
+    // Generate the next purchase number.
+    const counter = await Counter.findOneAndUpdate(
+      { name: "purchase" },
+      {
+        $inc: { value: 1 },
+        $setOnInsert: { name: "purchase" },
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true,
+      }
+    );
+
+    purchaseData.purchaseNumber =
+      `PUR-${String(counter.value).padStart(4, "0")}`;
+
+    stockDeltas = getStockDeltas(purchaseData.items);
+
+    await applyPurchaseStockChanges(stockDeltas);
+
+    try {
+      const purchase = await Purchase.create(purchaseData);
+
+      return res.status(201).json({
+        message: "Purchase created and stock updated successfully.",
+        purchase,
+      });
+    } catch (saveError) {
+      // Restore stock if saving the purchase fails.
+      const reverseDeltas = new Map(
+        [...stockDeltas].map(([id, delta]) => [id, -delta])
+      );
+
+      await applyPurchaseStockChanges(reverseDeltas);
+      throw saveError;
+    }
+  } catch (error) {
+    console.error("Add purchase error:", error);
+    return res.status(400).json({
+      message: "Failed to add purchase.",
+      error: error.message,
+    });
+  }
+});
+
+// EDIT PURCHASE
+app.put("/purchases/:id", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: "Invalid purchase ID.",
+      });
+    }
+
+    const existingPurchase = await Purchase.findById(req.params.id);
+
+    if (!existingPurchase) {
+      return res.status(404).json({
+        message: "Purchase not found.",
+      });
+    }
+
+    const updatedData = await preparePurchaseData(req.body);
+
+    // Only apply the difference between old and new quantities.
+    const stockDeltas = getStockDeltas(
+      updatedData.items,
+      existingPurchase.items
+    );
+
+    await applyPurchaseStockChanges(stockDeltas);
+
+    try {
+      Object.assign(existingPurchase, updatedData);
+
+      const updatedPurchase = await existingPurchase.save();
+
+      return res.status(200).json({
+        message: "Purchase updated and stock adjusted successfully.",
+        purchase: updatedPurchase,
+      });
+    } catch (saveError) {
+      const reverseDeltas = new Map(
+        [...stockDeltas].map(([id, delta]) => [id, -delta])
+      );
+
+      await applyPurchaseStockChanges(reverseDeltas);
+      throw saveError;
+    }
+  } catch (error) {
+    console.error("Update purchase error:", error);
+    return res.status(400).json({
+      message: "Failed to update purchase.",
+      error: error.message,
+    });
+  }
+});
+
+// DELETE PURCHASE
+app.delete("/purchases/:id", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: "Invalid purchase ID.",
+      });
+    }
+
+    const purchase = await Purchase.findById(req.params.id);
+
+    if (!purchase) {
+      return res.status(404).json({
+        message: "Purchase not found.",
+      });
+    }
+
+    // Reverse the stock added by this purchase.
+    const reverseDeltas = getStockDeltas([], purchase.items);
+
+    await applyPurchaseStockChanges(reverseDeltas);
+
+    try {
+      await Purchase.deleteOne({ _id: purchase._id });
+
+      return res.status(200).json({
+        message: "Purchase deleted and stock adjusted successfully.",
+      });
+    } catch (deleteError) {
+      // Restore stock if deleting the record fails.
+      const restoreDeltas = new Map(
+        [...reverseDeltas].map(([id, delta]) => [id, -delta])
+      );
+
+      await applyPurchaseStockChanges(restoreDeltas);
+      throw deleteError;
+    }
+  } catch (error) {
+    console.error("Delete purchase error:", error);
+    res.status(400).json({
+      message: "Failed to delete purchase.",
+      error: error.message,
+    });
+  }
+});
 
 const PORT = process.env.PORT || 5000;
 
