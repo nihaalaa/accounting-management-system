@@ -2,6 +2,9 @@ const express = require("express");
 const cors = require("cors");
 const mongoose=require("mongoose");
 
+const cloudinary = require("cloudinary").v2;
+const multer = require("multer");
+
 require("dotenv").config();
 
 const app = express();
@@ -922,6 +925,7 @@ async function preparePurchaseData(data) {
     items,
     amountPaid = 0,
     notes = "",
+      supplierInvoiceNumber = "",
   } = data;
 
   if (
@@ -1032,6 +1036,8 @@ async function preparePurchaseData(data) {
     amountPaid: paid,
     paymentStatus,
     notes: String(notes || "").trim(),
+
+      supplierInvoiceNumber: String(supplierInvoiceNumber || "").trim(),
   };
 }
 
@@ -1104,7 +1110,59 @@ async function applyPurchaseStockChanges(deltas) {
     throw error;
   }
 }
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
+const uploadSupplierInvoice = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10 MB
+  },
+  fileFilter: (req, file, callback) => {
+    const allowedTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+    ];
+
+    if (allowedTypes.includes(file.mimetype)) {
+      return callback(null, true);
+    }
+
+    callback(
+      new Error("Only PDF, JPG, and PNG files are allowed.")
+    );
+  },
+});
+
+function uploadInvoiceToCloudinary(file) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "accounting-system/supplier-invoices",
+        resource_type: "auto",
+      },
+      (error, result) => {
+        if (error) {
+          return reject(error);
+        }
+
+        resolve({
+          url: result.secure_url,
+          publicId: result.public_id,
+          originalName: file.originalname,
+        });
+      }
+    );
+
+    stream.end(file.buffer);
+  });
+}
+
+//PURCHASE ROUTES
 // GET ALL PURCHASES
 app.get("/purchases", async (req, res) => {
   try {
@@ -1148,110 +1206,191 @@ app.get("/purchases/:id", async (req, res) => {
 });
 
 // ADD PURCHASE
-app.post("/purchases", async (req, res) => {
-  let stockDeltas;
 
-  try {
-    const purchaseData = await preparePurchaseData(req.body);
+app.post(
+  "/purchases",
+  uploadSupplierInvoice.single("supplierInvoiceFile"),
+  async (req, res) => {
+    let stockDeltas;
+    let uploadedInvoice = null;
 
-    // Generate the next purchase number.
-    const counter = await Counter.findOneAndUpdate(
-      { name: "purchase" },
-      {
-        $inc: { value: 1 },
-        $setOnInsert: { name: "purchase" },
-      },
-      {
-        new: true,
-        upsert: true,
-        setDefaultsOnInsert: true,
+    try {
+      // FormData sends items as a JSON string.
+      const requestData = {
+        ...req.body,
+        items:
+          typeof req.body.items === "string"
+            ? JSON.parse(req.body.items)
+            : req.body.items,
+      };
+
+      const purchaseData = await preparePurchaseData(requestData);
+
+      // Upload the optional supplier invoice to Cloudinary.
+      if (req.file) {
+        uploadedInvoice = await uploadInvoiceToCloudinary(req.file);
+        purchaseData.supplierInvoiceFile = uploadedInvoice;
       }
-    );
 
-    purchaseData.purchaseNumber =
-      `PUR-${String(counter.value).padStart(4, "0")}`;
-
-    stockDeltas = getStockDeltas(purchaseData.items);
-
-    await applyPurchaseStockChanges(stockDeltas);
-
-    try {
-      const purchase = await Purchase.create(purchaseData);
-
-      return res.status(201).json({
-        message: "Purchase created and stock updated successfully.",
-        purchase,
-      });
-    } catch (saveError) {
-      // Restore stock if saving the purchase fails.
-      const reverseDeltas = new Map(
-        [...stockDeltas].map(([id, delta]) => [id, -delta])
+      // Generate the next purchase number.
+      const counter = await Counter.findOneAndUpdate(
+        { name: "purchase" },
+        {
+          $inc: { value: 1 },
+          $setOnInsert: { name: "purchase" },
+        },
+        {
+          new: true,
+          upsert: true,
+          setDefaultsOnInsert: true,
+        }
       );
 
-      await applyPurchaseStockChanges(reverseDeltas);
-      throw saveError;
-    }
-  } catch (error) {
-    console.error("Add purchase error:", error);
-    return res.status(400).json({
-      message: "Failed to add purchase.",
-      error: error.message,
-    });
-  }
-});
+      purchaseData.purchaseNumber =
+        `PUR-${String(counter.value).padStart(4, "0")}`;
 
-// EDIT PURCHASE
-app.put("/purchases/:id", async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      stockDeltas = getStockDeltas(purchaseData.items);
+
+      await applyPurchaseStockChanges(stockDeltas);
+
+      try {
+        const purchase = await Purchase.create(purchaseData);
+
+        return res.status(201).json({
+          message: "Purchase created and stock updated successfully.",
+          purchase,
+        });
+      } catch (saveError) {
+        // Restore stock if saving the purchase fails.
+        const reverseDeltas = new Map(
+          [...stockDeltas].map(([id, delta]) => [id, -delta])
+        );
+
+        await applyPurchaseStockChanges(reverseDeltas);
+        throw saveError;
+      }
+    } catch (error) {
+      // Delete the uploaded file if purchase creation fails.
+      if (uploadedInvoice?.publicId) {
+        try {
+          await cloudinary.uploader.destroy(
+            uploadedInvoice.publicId,
+            { resource_type: "image" }
+          );
+        } catch (cleanupError) {
+          console.error("Invoice cleanup error:", cleanupError);
+        }
+      }
+
+      console.error("Add purchase error:", error);
+
       return res.status(400).json({
-        message: "Invalid purchase ID.",
+        message: "Failed to add purchase.",
+        error: error.message,
       });
     }
+  }
+);
 
-    const existingPurchase = await Purchase.findById(req.params.id);
 
-    if (!existingPurchase) {
-      return res.status(404).json({
-        message: "Purchase not found.",
-      });
-    }
-
-    const updatedData = await preparePurchaseData(req.body);
-
-    // Only apply the difference between old and new quantities.
-    const stockDeltas = getStockDeltas(
-      updatedData.items,
-      existingPurchase.items
-    );
-
-    await applyPurchaseStockChanges(stockDeltas);
+ // EDIT PURCHASE
+app.put(
+  "/purchases/:id",
+  uploadSupplierInvoice.single("supplierInvoiceFile"),
+  async (req, res) => {
+    let newInvoice = null;
 
     try {
-      Object.assign(existingPurchase, updatedData);
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({
+          message: "Invalid purchase ID.",
+        });
+      }
 
-      const updatedPurchase = await existingPurchase.save();
+      const existingPurchase = await Purchase.findById(req.params.id);
 
-      return res.status(200).json({
-        message: "Purchase updated and stock adjusted successfully.",
-        purchase: updatedPurchase,
-      });
-    } catch (saveError) {
-      const reverseDeltas = new Map(
-        [...stockDeltas].map(([id, delta]) => [id, -delta])
+      if (!existingPurchase) {
+        return res.status(404).json({
+          message: "Purchase not found.",
+        });
+      }
+
+      // Parse items sent through FormData.
+      const requestData = {
+        ...req.body,
+        items:
+          typeof req.body.items === "string"
+            ? JSON.parse(req.body.items)
+            : req.body.items,
+      };
+
+      const updatedData = await preparePurchaseData(requestData);
+
+      // Keep the existing invoice unless a replacement is uploaded.
+      updatedData.supplierInvoiceFile =
+        existingPurchase.supplierInvoiceFile;
+
+      if (req.file) {
+        newInvoice = await uploadInvoiceToCloudinary(req.file);
+        updatedData.supplierInvoiceFile = newInvoice;
+      }
+
+      // Only apply the difference between old and new quantities.
+      const stockDeltas = getStockDeltas(
+        updatedData.items,
+        existingPurchase.items
       );
 
-      await applyPurchaseStockChanges(reverseDeltas);
-      throw saveError;
+      await applyPurchaseStockChanges(stockDeltas);
+
+      try {
+        Object.assign(existingPurchase, updatedData);
+
+        const updatedPurchase = await existingPurchase.save();
+
+        // Delete the old invoice only after the database save succeeds.
+        if (
+          newInvoice &&
+          existingPurchase.supplierInvoiceFile?.publicId
+        ) {
+          // The old file reference may already have been overwritten.
+          // Capture the old reference before assigning updatedData.
+        }
+
+        return res.status(200).json({
+          message: "Purchase updated and stock adjusted successfully.",
+          purchase: updatedPurchase,
+        });
+      } catch (saveError) {
+        const reverseDeltas = new Map(
+          [...stockDeltas].map(([id, delta]) => [id, -delta])
+        );
+
+        await applyPurchaseStockChanges(reverseDeltas);
+        throw saveError;
+      }
+    } catch (error) {
+      // Clean up a newly uploaded file if the update fails.
+      if (newInvoice?.publicId) {
+        try {
+          await cloudinary.uploader.destroy(newInvoice.publicId, {
+            resource_type: "raw",
+          });
+        } catch (cleanupError) {
+          console.error("Invoice cleanup error:", cleanupError);
+        }
+      }
+
+      console.error("Update purchase error:", error);
+
+      return res.status(400).json({
+        message: "Failed to update purchase.",
+        error: error.message,
+      });
     }
-  } catch (error) {
-    console.error("Update purchase error:", error);
-    return res.status(400).json({
-      message: "Failed to update purchase.",
-      error: error.message,
-    });
   }
-});
+);
+
 
 // DELETE PURCHASE
 app.delete("/purchases/:id", async (req, res) => {

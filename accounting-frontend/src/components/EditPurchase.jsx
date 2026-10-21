@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -30,6 +29,7 @@ const initialItem = {
   productId: "",
   quantity: "1",
   purchasePrice: "",
+  productSearch:"",
 };
 
 const formatCurrency = (amount) =>
@@ -187,27 +187,29 @@ const EditPurchase = () => {
       )
     );
   };
+const handleProductChange = (index, productId) => {
+  const selectedProduct = products.find(
+    (product) => product._id === productId
+  );
 
-  const handleProductChange = (index, productId) => {
-    const selectedProduct = products.find(
-      (product) => product._id === productId
-    );
-
-    setItems((previous) =>
-      previous.map((item, i) =>
-        i === index
-          ? {
-              ...item,
-              productId,
-              purchasePrice:
-                selectedProduct?.purchasePrice != null
-                  ? String(selectedProduct.purchasePrice)
-                  : "",
-            }
-          : item
-      )
-    );
-  };
+  setItems((previous) =>
+    previous.map((item, i) =>
+      i === index
+        ? {
+            ...item,
+            productId,
+            productSearch: selectedProduct
+              ? `${selectedProduct.name} (${selectedProduct.code || "N/A"})`
+              : "",
+            purchasePrice:
+              selectedProduct?.purchasePrice != null
+                ? String(selectedProduct.purchasePrice)
+                : "",
+          }
+        : item
+    )
+  );
+};
 
   const addItem = () => {
     setItems((previous) => [
@@ -497,29 +499,96 @@ const EditPurchase = () => {
                         Product <span>*</span>
                       </Form.Label>
 
-                      <Form.Select
-                        value={item.productId}
-                        onChange={(e) =>
-                          handleProductChange(
-                            index,
-                            e.target.value
-                          )
-                        }
-                        required
-                      >
-                        <option value="">Select product</option>
-                        {products.map((product) => (
-                          <option
-                            key={product._id}
-                            value={product._id}
-                          >
-                            {product.name}
-                            {product.code
-                              ? ` (${product.code})`
-                              : ""}
-                          </option>
-                        ))}
-                      </Form.Select>
+
+<Form.Control
+  type="text"
+  placeholder="Search by product name or code..."
+  value={item.productSearch || ""}
+  onChange={(e) => {
+    const value = e.target.value;
+
+    setItems((previous) =>
+      previous.map((existing, i) =>
+        i === index
+          ? {
+              ...existing,
+              productSearch: value,
+              productId: "",
+              purchasePrice: "",
+            }
+          : existing
+      )
+    );
+  }}
+  className="purchase-input"
+  autoComplete="off"
+  required
+/>
+
+{item.productSearch?.trim() && !item.productId && (
+  <div
+    style={{
+      marginTop: "6px",
+      border: "1px solid #dce3eb",
+      borderRadius: "8px",
+      background: "#fff",
+      maxHeight: "200px",
+      overflowY: "auto",
+    }}
+  >
+    {products
+      .filter((product) =>
+        `${product.name || ""} ${product.code || ""}`
+          .toLowerCase()
+          .includes(item.productSearch.toLowerCase().trim())
+      )
+      .filter(
+        (product) =>
+          !items.some(
+            (existing, existingIndex) =>
+              existing.productId === product._id &&
+              existingIndex !== index
+          )
+      )
+      .map((product) => (
+        <button
+          key={product._id}
+          type="button"
+          onClick={() =>
+            handleProductChange(index, product._id)
+          }
+          style={{
+            display: "block",
+            width: "100%",
+            padding: "10px 12px",
+            border: "none",
+            borderBottom: "1px solid #edf0f4",
+            background: "#fff",
+            textAlign: "left",
+            cursor: "pointer",
+            color: "#26394f",
+            fontSize: "12px",
+          }}
+        >
+          <strong>{product.name}</strong>
+          <div style={{ color: "#8793a3", marginTop: "3px" }}>
+            Code: {product.code || "N/A"}
+          </div>
+        </button>
+      ))}
+
+    {products.filter((product) =>
+      `${product.name || ""} ${product.code || ""}`
+        .toLowerCase()
+        .includes(item.productSearch.toLowerCase().trim())
+    ).length === 0 && (
+      <div style={{ padding: "12px", color: "#8793a3" }}>
+        No matching products found.
+      </div>
+    )}
+  </div>
+)}
+
                     </Col>
 
                     <Col lg={2} sm={4}>

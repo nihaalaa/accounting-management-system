@@ -89,6 +89,25 @@ const purchaseSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+supplierInvoiceNumber: {
+  type: String,
+  default: "",
+  trim: true,
+},
+supplierInvoiceFile: {
+  url: {
+    type: String,
+    default: "",
+  },
+  publicId: {
+    type: String,
+    default: "",
+  },
+  originalName: {
+    type: String,
+    default: "",
+  },
+},
   },
   { timestamps: true }
 );

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Card, Col, Form, Row, Spinner, Alert } from "react-bootstrap";
@@ -23,6 +22,7 @@ const today = new Date().toLocaleDateString("en-CA");
 const initialItem = {
   productId: "",
   quantity: "1",
+    productSearch: "",
   purchasePrice: "",
 };
 
@@ -47,6 +47,8 @@ export default function AddPurchase() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState("");
+  const [supplierInvoiceFile, setSupplierInvoiceFile] = useState(null);
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -126,12 +128,17 @@ export default function AddPurchase() {
 
         const updated = { ...item, [field]: value };
 
-        if (field === "productId") {
-          const product = products.find((p) => p._id === value);
-          updated.purchasePrice = product
-            ? String(product.purchasePrice ?? 0)
-            : "";
-        }
+if (field === "productId") {
+  const product = products.find((p) => p._id === value);
+
+  updated.purchasePrice = product
+    ? String(product.purchasePrice ?? 0)
+    : "";
+
+  updated.productSearch = product
+    ? `${product.name} (${product.code})`
+    : "";
+}
 
         return updated;
       })
@@ -210,32 +217,52 @@ export default function AddPurchase() {
       return;
     }
 
-    const payload = {
-      supplierId,
-      purchaseDate,
-      items: items.map((item) => ({
-        productId: item.productId,
-        quantity: Number(item.quantity),
-        purchasePrice: Number(item.purchasePrice),
-      })),
-      amountPaid: paid,
-      notes: notes.trim(),
-    };
 
-    try {
-      setSaving(true);
+const formData = new FormData();
 
-      await axios.post(`${API}/purchases`, payload);
+formData.append("supplierId", supplierId);
+formData.append("purchaseDate", purchaseDate);
+
+formData.append(
+  "items",
+  JSON.stringify(
+    items.map((item) => ({
+      productId: item.productId,
+      quantity: Number(item.quantity),
+      purchasePrice: Number(item.purchasePrice),
+    }))
+  )
+);
+
+formData.append("amountPaid", String(paid));
+formData.append("notes", notes.trim());
+formData.append(
+  "supplierInvoiceNumber",
+  supplierInvoiceNumber.trim()
+);
+
+if (supplierInvoiceFile) {
+  formData.append("supplierInvoiceFile", supplierInvoiceFile);
+}
+
+try {
+  setSaving(true);
+
+  await axios.post(`${API}/purchases`, formData);
+
 
       navigate("/purchases", {
         state: { message: "Purchase created successfully." },
       });
     } catch (err) {
       console.error("Create purchase error:", err);
+      console.log("Status:", err.response?.status);
+console.log("Backend response:", err.response?.data);
       setError(
         err.response?.data?.error ||
           err.response?.data?.message ||
           "Failed to save purchase. Please try again."
+          
       );
     } finally {
       setSaving(false);
@@ -923,6 +950,46 @@ export default function AddPurchase() {
                       />
                     </div>
                   </Col>
+                  
+<Col md={6}>
+  <Form.Label className="purchase-label">
+    Supplier Invoice Number
+  </Form.Label>
+
+  <Form.Control
+    type="text"
+    value={supplierInvoiceNumber}
+    onChange={(e) => setSupplierInvoiceNumber(e.target.value)}
+    placeholder="Enter supplier invoice number (optional)"
+    className="purchase-input"
+  />
+</Col>
+
+<Col md={6}>
+  <Form.Label className="purchase-label">
+    Upload Supplier Invoice
+  </Form.Label>
+
+  <Form.Control
+    type="file"
+    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+    onChange={(e) =>
+      setSupplierInvoiceFile(e.target.files?.[0] || null)
+    }
+    className="purchase-input"
+  />
+
+  <small className="purchase-field-hint">
+    Optional. PDF, JPG, or PNG; maximum 10 MB.
+  </small>
+
+  {supplierInvoiceFile && (
+    <small className="purchase-field-hint">
+      Selected: {supplierInvoiceFile.name}
+    </small>
+  )}
+</Col>
+
                 </Row>
               </Card.Body>
             </Card>
@@ -978,34 +1045,114 @@ export default function AddPurchase() {
 
                       <Row className="g-3 align-items-end">
                         <Col lg={5} md={12}>
-                          <Form.Label className="purchase-label">
-                            Product <span>*</span>
-                          </Form.Label>
 
-                          <Form.Select
-                            value={item.productId}
-                            onChange={(e) =>
-                              updateItem(index, "productId", e.target.value)
-                            }
-                            className="purchase-input"
-                            required
-                          >
-                            <option value="">Select a product</option>
+<Form.Label className="purchase-label">
+  Product <span>*</span>
+</Form.Label>
 
-                            {products.map((product) => (
-                              <option
-                                key={product._id}
-                                value={product._id}
-                                disabled={items.some(
-                                  (existing, existingIndex) =>
-                                    existing.productId === product._id &&
-                                    existingIndex !== index
-                                )}
-                              >
-                                {product.name} ({product.code})
-                              </option>
-                            ))}
-                          </Form.Select>
+<Form.Control
+  type="text"
+  placeholder="Search by product name or code..."
+  value={item.productSearch}
+onChange={(e) => {
+  const value = e.target.value;
+
+  setItems((previous) =>
+    previous.map((existing, i) =>
+      i === index
+        ? {
+            ...existing,
+            productSearch: value,
+            productId: "",
+            purchasePrice: "",
+          }
+        : existing
+    )
+  );
+}}
+  className="purchase-input"
+  autoComplete="off"
+/>
+
+{item.productSearch.trim() !== "" && !item.productId && (
+  <div
+    style={{
+      marginTop: "6px",
+      border: "1px solid #dce3eb",
+      borderRadius: "8px",
+      background: "#fff",
+      maxHeight: "200px",
+      overflowY: "auto",
+    }}
+  >
+    {products
+      .filter((product) => {
+        const search = item.productSearch.toLowerCase().trim();
+
+        return (
+          `${product.name || ""} ${product.code || ""}`
+            .toLowerCase()
+            .includes(search)
+        );
+      })
+      .filter(
+        (product) =>
+          !items.some(
+            (existing, existingIndex) =>
+              existing.productId === product._id &&
+              existingIndex !== index
+          )
+      )
+      .map((product) => (
+        <button
+          key={product._id}
+          type="button"
+          onClick={() =>
+            updateItem(index, "productId", product._id)
+          }
+          style={{
+            display: "block",
+            width: "100%",
+            padding: "10px 12px",
+            border: "none",
+            borderBottom: "1px solid #edf0f4",
+            background: "#fff",
+            textAlign: "left",
+            cursor: "pointer",
+            color: "#26394f",
+            fontSize: "12px",
+          }}
+        >
+          <strong>{product.name}</strong>
+          <div style={{ color: "#8793a3", marginTop: "3px" }}>
+            Code: {product.code || "N/A"} · Stock:{" "}
+            {product.currentStock ?? 0} {product.unit || "units"}
+          </div>
+        </button>
+      ))}
+
+    {products.filter((product) => {
+      const search = item.productSearch.toLowerCase().trim();
+
+      return (
+        `${product.name || ""} ${product.code || ""}`
+          .toLowerCase()
+          .includes(search) &&
+        !items.some(
+          (existing, existingIndex) =>
+            existing.productId === product._id &&
+            existingIndex !== index
+        )
+      );
+    }).length === 0 && (
+      <div style={{ padding: "12px", color: "#8793a3", fontSize: "12px" }}>
+        No matching products found.
+      </div>
+    )}
+  </div>
+)}
+
+
 
                           {item.product && (
                             <div className="purchase-stock-hint">
