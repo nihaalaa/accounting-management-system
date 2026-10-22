@@ -1147,14 +1147,17 @@ function uploadInvoiceToCloudinary(file) {
         resource_type: "auto",
       },
 (error, result) => {
-  if (error) {
-    console.error("Cloudinary upload error details:", {
-      message: error.message,
-      http_code: error.http_code,
-      name: error.name,
-      error: error.error,
-      stack: error.stack,
-    });
+if (error) {
+  console.error("Cloudinary upload error details:", {
+    message: error.message,
+    http_code: error.http_code,
+    name: error.name,
+    request_id: error.request_id,
+    response: error.response,
+    response_headers: error.response?.headers,
+    response_body: error.response?.body,
+  });
+
   return reject(error);
 }
 
