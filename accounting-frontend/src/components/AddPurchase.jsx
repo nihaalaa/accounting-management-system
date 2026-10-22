@@ -257,8 +257,10 @@ try {
     } catch (err) {
       console.error("Create purchase error:", err);
       console.log("Status:", err.response?.status);
-console.log("Backend response:", err.response?.data);
-      setError(
+console.log(
+  "Backend response:",
+  JSON.stringify(err.response?.data, null, 2)
+);      setError(
         err.response?.data?.error ||
           err.response?.data?.message ||
           "Failed to save purchase. Please try again."
