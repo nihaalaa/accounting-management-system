@@ -1217,8 +1217,7 @@ app.get("/purchases/:id", async (req, res) => {
 });
 
 // ADD PURCHASE
-app.post("/purchases", async (req, res) => {
-  console.log("Received invoice URL:", req.body.supplierInvoiceUrl);
+app.post("/purchases", uploadSupplierInvoice.none(), async (req, res) => {  console.log("Received invoice URL:", req.body.supplierInvoiceUrl);
 console.log("Received invoice public ID:", req.body.supplierInvoicePublicId);
 console.log("Received invoice filename:", req.body.supplierInvoiceOriginalName);
     let stockDeltas;
