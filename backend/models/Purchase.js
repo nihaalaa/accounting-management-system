@@ -94,6 +94,7 @@ supplierInvoiceNumber: {
   default: "",
   trim: true,
 },
+
 supplierInvoiceFile: {
   url: {
     type: String,
@@ -107,7 +108,12 @@ supplierInvoiceFile: {
     type: String,
     default: "",
   },
+  resourceType: {
+    type: String,
+    default: "",
+  },
 },
+
   },
   { timestamps: true }
 );

@@ -156,7 +156,24 @@ if (field === "productId") {
         : previous.filter((_, i) => i !== index)
     );
   };
+const uploadSupplierInvoiceToCloudinary = async (file) => {
+  const cloudinaryFormData = new FormData();
 
+  cloudinaryFormData.append("file", file);
+  cloudinaryFormData.append("upload_preset", "testimage");
+
+  const response = await axios.post(
+    "https://api.cloudinary.com/v1_1/kvti0onx/auto/upload",
+    cloudinaryFormData
+  );
+
+  return {
+    url: response.data.secure_url,
+    publicId: response.data.public_id,
+    originalName: file.name,
+    resourceType: response.data.resource_type,
+  };
+};
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -245,30 +262,85 @@ if (supplierInvoiceFile) {
   formData.append("supplierInvoiceFile", supplierInvoiceFile);
 }
 
+
 try {
   setSaving(true);
 
-  await axios.post(`${import.meta.env.VITE_API_URL}/purchases`, formData);
+  // Upload the supplier invoice first, if one was selected.
+  let uploadedInvoice = null;
 
+  if (supplierInvoiceFile) {
+    uploadedInvoice = await uploadSupplierInvoiceToCloudinary(
+      supplierInvoiceFile
+      
+    );console.log("Cloudinary upload result:", uploadedInvoice);
+  }
 
-      navigate("/purchases", {
-        state: { message: "Purchase created successfully." },
-      });
-    } catch (err) {
-      console.error("Create purchase error:", err);
-      console.log("Status:", err.response?.status);
+  const formData = new FormData();
+
+  formData.append("supplierId", supplierId);
+  formData.append("purchaseDate", purchaseDate);
+
+  formData.append(
+    "items",
+    JSON.stringify(
+      items.map((item) => ({
+        productId: item.productId,
+        quantity: Number(item.quantity),
+        purchasePrice: Number(item.purchasePrice),
+      }))
+    )
+  );
+
+  formData.append("amountPaid", String(paid));
+  formData.append("notes", notes.trim());
+  formData.append(
+    "supplierInvoiceNumber",
+    supplierInvoiceNumber.trim()
+  );
+
+  if (uploadedInvoice) {
+    formData.append("supplierInvoiceUrl", uploadedInvoice.url);
+    formData.append(
+      "supplierInvoicePublicId",
+      uploadedInvoice.publicId
+    );
+    formData.append(
+      "supplierInvoiceOriginalName",
+      uploadedInvoice.originalName
+    );
+    formData.append(
+      "supplierInvoiceResourceType",
+      uploadedInvoice.resourceType
+    );
+  }
+
+  await axios.post(`${API}/purchases`, formData);
 console.log(
-  "Backend response:",
-  JSON.stringify(err.response?.data, null, 2)
-);      setError(
-        err.response?.data?.error ||
-          err.response?.data?.message ||
-          "Failed to save purchase. Please try again."
-          
-      );
-    } finally {
-      setSaving(false);
-    }
+  "Invoice URL being sent:",
+  formData.get("supplierInvoiceUrl")
+);
+  navigate("/purchases", {
+    state: { message: "Purchase created successfully." },
+  });
+} catch (err) {
+  console.error("Create purchase error:", err);
+  console.log("Status:", err.response?.status);
+  console.log(
+    "Backend response:",
+    JSON.stringify(err.response?.data, null, 2)
+  );
+
+  setError(
+    err.response?.data?.error ||
+      err.response?.data?.message ||
+      err.message ||
+      "Failed to save purchase. Please try again."
+  );
+} finally {
+  setSaving(false);
+}
+
   };
 
   return (

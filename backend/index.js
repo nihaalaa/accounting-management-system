@@ -1217,14 +1217,11 @@ app.get("/purchases/:id", async (req, res) => {
 });
 
 // ADD PURCHASE
-
-app.post(
-  "/purchases",
-  uploadSupplierInvoice.single("supplierInvoiceFile"),
-  async (req, res) => {
+app.post("/purchases", async (req, res) => {
+  console.log("Received invoice URL:", req.body.supplierInvoiceUrl);
+console.log("Received invoice public ID:", req.body.supplierInvoicePublicId);
+console.log("Received invoice filename:", req.body.supplierInvoiceOriginalName);
     let stockDeltas;
-    let uploadedInvoice = null;
-
     try {
       // FormData sends items as a JSON string.
       const requestData = {
@@ -1236,12 +1233,14 @@ app.post(
       };
 
       const purchaseData = await preparePurchaseData(requestData);
-
-      // Upload the optional supplier invoice to Cloudinary.
-      if (req.file) {
-        uploadedInvoice = await uploadInvoiceToCloudinary(req.file);
-        purchaseData.supplierInvoiceFile = uploadedInvoice;
-      }
+      if (requestData.supplierInvoiceUrl) {
+  purchaseData.supplierInvoiceFile = {
+    url: requestData.supplierInvoiceUrl,
+    publicId: requestData.supplierInvoicePublicId || "",
+    originalName: requestData.supplierInvoiceOriginalName || "",
+    resourceType: requestData.supplierInvoiceResourceType || "",
+  };
+}
 
       // Generate the next purchase number.
       const counter = await Counter.findOneAndUpdate(
@@ -1281,18 +1280,6 @@ app.post(
         throw saveError;
       }
     } catch (error) {
-      // Delete the uploaded file if purchase creation fails.
-      if (uploadedInvoice?.publicId) {
-        try {
-          await cloudinary.uploader.destroy(
-            uploadedInvoice.publicId,
-            { resource_type: "image" }
-          );
-        } catch (cleanupError) {
-          console.error("Invoice cleanup error:", cleanupError);
-        }
-      }
-
       console.error("Add purchase error:", error);
 
       return res.status(400).json({
