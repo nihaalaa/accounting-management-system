@@ -918,6 +918,7 @@ app.delete("/suppliers/:id", async (req, res) => {
 ========================= */
 
 // Calculate purchase details and validate supplier/products.
+
 async function preparePurchaseData(data) {
   const {
     supplierId,
@@ -925,7 +926,9 @@ async function preparePurchaseData(data) {
     items,
     amountPaid = 0,
     notes = "",
-      supplierInvoiceNumber = "",
+    supplierInvoiceNumber = "",
+    paymentMethod = "Cash",
+    paymentDueDate = "",
   } = data;
 
   if (
@@ -1027,6 +1030,52 @@ async function preparePurchaseData(data) {
     throw new Error("Invalid purchase date.");
   }
 
+  const allowedPaymentMethods = [
+    "Cash",
+    "Bank Transfer",
+    "UPI",
+    "Card",
+    "Cheque",
+    "Credit",
+  ];
+
+  if (!allowedPaymentMethods.includes(paymentMethod)) {
+    throw new Error("Please select a valid payment method.");
+  }
+
+  let parsedDueDate = null;
+
+  if (paymentDueDate) {
+    // Parse the date-only input as a local calendar date.
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(
+      paymentDueDate
+    );
+
+    if (!match) {
+      throw new Error("Invalid payment due date.");
+    }
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+
+    parsedDueDate = new Date(year, month - 1, day);
+
+    if (
+      parsedDueDate.getFullYear() !== year ||
+      parsedDueDate.getMonth() !== month - 1 ||
+      parsedDueDate.getDate() !== day
+    ) {
+      throw new Error("Invalid payment due date.");
+    }
+  }
+
+  if (paymentStatus !== "Paid" && !parsedDueDate) {
+    throw new Error(
+      "Please select a payment due date for unpaid or partially paid purchases."
+    );
+  }
+
   return {
     supplierId: supplier._id,
     supplierName: supplier.supplierName,
@@ -1035,9 +1084,12 @@ async function preparePurchaseData(data) {
     grandTotal,
     amountPaid: paid,
     paymentStatus,
+    paymentMethod,
+    paymentDueDate: parsedDueDate,
     notes: String(notes || "").trim(),
-
-      supplierInvoiceNumber: String(supplierInvoiceNumber || "").trim(),
+    supplierInvoiceNumber: String(
+      supplierInvoiceNumber || ""
+    ).trim(),
   };
 }
 

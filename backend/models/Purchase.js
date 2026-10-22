@@ -84,6 +84,23 @@ const purchaseSchema = new mongoose.Schema(
       enum: ["Paid", "Partially Paid", "Unpaid"],
       default: "Unpaid",
     },
+    paymentMethod: {
+  type: String,
+  enum: [
+    "Cash",
+    "Bank Transfer",
+    "UPI",
+    "Card",
+    "Cheque",
+    "Credit",
+  ],
+  default: "Cash",
+},
+
+paymentDueDate: {
+  type: Date,
+  default: null,
+},
     notes: {
       type: String,
       default: "",

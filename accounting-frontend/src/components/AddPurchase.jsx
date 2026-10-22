@@ -43,6 +43,9 @@ export default function AddPurchase() {
   const [amountPaid, setAmountPaid] = useState("0");
   const [notes, setNotes] = useState("");
 
+  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [paymentDueDate, setPaymentDueDate] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -252,7 +255,10 @@ formData.append(
 );
 
 formData.append("amountPaid", String(paid));
+formData.append("paymentMethod", paymentMethod);
+formData.append("paymentDueDate", paymentDueDate);
 formData.append("notes", notes.trim());
+
 formData.append(
   "supplierInvoiceNumber",
   supplierInvoiceNumber.trim()
@@ -1335,6 +1341,49 @@ onChange={(e) => {
                     <small className="purchase-field-hint">
                       The remaining amount will be recorded as outstanding.
                     </small>
+
+
+<Row className="g-3 mt-2">
+  <Col sm={6}>
+    <Form.Label className="purchase-label">
+      Payment Method <span>*</span>
+    </Form.Label>
+
+    <Form.Select
+      value={paymentMethod}
+      onChange={(e) => setPaymentMethod(e.target.value)}
+      className="purchase-input"
+      required
+    >
+      <option value="Cash">Cash</option>
+      <option value="Bank Transfer">Bank Transfer</option>
+      <option value="UPI">UPI</option>
+      <option value="Card">Card</option>
+      <option value="Cheque">Cheque</option>
+      <option value="Credit">Credit</option>
+    </Form.Select>
+  </Col>
+
+{paymentStatus !== "Paid" && (
+  <Col sm={6}>
+    <Form.Label className="purchase-label">
+      Payment Due Date <span>*</span>
+    </Form.Label>
+
+    <Form.Control
+      type="date"
+      value={paymentDueDate}
+      onChange={(e) => setPaymentDueDate(e.target.value)}
+      className="purchase-input"
+      required
+    />
+
+    <small className="purchase-field-hint">
+      Enter the date by which the remaining balance must be paid.
+    </small>
+  </Col>
+)}
+</Row>
 
                     <Row className="g-3 mt-2">
                       <Col sm={6}>

@@ -243,6 +243,14 @@ export default function ViewPurchase() {
               value={status}
             />
             
+            {status !== "Paid" && (
+  <InfoRow
+    icon={<BsCalendar3 />}
+    label="Payment Due Date"
+    value={formatDate(purchase.paymentDueDate)}
+  />
+)}
+
 <InfoRow
   icon={<BsFileText />}
   label="Supplier Invoice Number"
