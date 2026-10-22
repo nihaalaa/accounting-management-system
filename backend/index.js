@@ -1323,14 +1323,22 @@ app.put(
 
       const updatedData = await preparePurchaseData(requestData);
 
-      // Keep the existing invoice unless a replacement is uploaded.
-      updatedData.supplierInvoiceFile =
-        existingPurchase.supplierInvoiceFile;
+// Keep the existing invoice unless a replacement is uploaded.
+updatedData.supplierInvoiceFile =
+  existingPurchase.supplierInvoiceFile;
 
-      if (req.file) {
-        newInvoice = await uploadInvoiceToCloudinary(req.file);
-        updatedData.supplierInvoiceFile = newInvoice;
-      }
+if (requestData.supplierInvoiceUrl) {
+  updatedData.supplierInvoiceFile = {
+    url: requestData.supplierInvoiceUrl,
+    publicId: requestData.supplierInvoicePublicId || "",
+    originalName: requestData.supplierInvoiceOriginalName || "",
+    resourceType: requestData.supplierInvoiceResourceType || "",
+  };
+} else if (req.file) {
+  newInvoice = await uploadInvoiceToCloudinary(req.file);
+  updatedData.supplierInvoiceFile = newInvoice;
+}
+
 
       // Only apply the difference between old and new quantities.
       const stockDeltas = getStockDeltas(
@@ -1344,15 +1352,6 @@ app.put(
         Object.assign(existingPurchase, updatedData);
 
         const updatedPurchase = await existingPurchase.save();
-
-        // Delete the old invoice only after the database save succeeds.
-        if (
-          newInvoice &&
-          existingPurchase.supplierInvoiceFile?.publicId
-        ) {
-          // The old file reference may already have been overwritten.
-          // Capture the old reference before assigning updatedData.
-        }
 
         return res.status(200).json({
           message: "Purchase updated and stock adjusted successfully.",

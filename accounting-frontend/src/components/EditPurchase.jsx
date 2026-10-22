@@ -53,6 +53,25 @@ const getToday = () =>
     .toISOString()
     .slice(0, 10);
 
+    const uploadSupplierInvoiceToCloudinary = async (file) => {
+  const formData = new FormData();
+
+  formData.append("file", file);
+  formData.append("upload_preset", "testimage");
+
+  const response = await axios.post(
+    "https://api.cloudinary.com/v1_1/kvti0onx/auto/upload",
+    formData
+  );
+
+  return {
+    url: response.data.secure_url,
+    publicId: response.data.public_id,
+    originalName: file.name,
+    resourceType: response.data.resource_type,
+  };
+};
+
 const EditPurchase = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -63,13 +82,19 @@ const EditPurchase = () => {
   const [supplierId, setSupplierId] = useState("");
   const [purchaseDate, setPurchaseDate] = useState("");
   const [items, setItems] = useState([{ ...initialItem }]);
-  const [amountPaid, setAmountPaid] = useState("0");
-  const [notes, setNotes] = useState("");
+
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const [amountPaid, setAmountPaid] = useState("0");
+  const [notes, setNotes] = useState("");
+
+  const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState("");
+  const [supplierInvoiceFile, setSupplierInvoiceFile] = useState(null);
+  const [existingSupplierInvoice, setExistingSupplierInvoice] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -115,13 +140,24 @@ const EditPurchase = () => {
                 .slice(0, 10)
         );
 
-        const savedItems = Array.isArray(purchaseData.items)
-          ? purchaseData.items.map((item) => ({
-              productId: getId(item.productId),
-              quantity: String(item.quantity ?? 1),
-              purchasePrice: String(item.purchasePrice ?? 0),
-            }))
-          : [];
+const savedItems = Array.isArray(purchaseData.items)
+  ? purchaseData.items.map((item) => {
+      const productId = getId(item.productId);
+
+      const product = productData.find(
+        (p) => p._id === productId
+      );
+
+      return {
+        productId,
+        productSearch: product
+          ? `${product.name} (${product.code || "N/A"})`
+          : item.productName || "",
+        quantity: String(item.quantity ?? 1),
+        purchasePrice: String(item.purchasePrice ?? 0),
+      };
+    })
+  : [];
 
         setItems(
           savedItems.length ? savedItems : [{ ...initialItem }]
@@ -129,6 +165,17 @@ const EditPurchase = () => {
 
         setAmountPaid(String(purchaseData.amountPaid ?? 0));
         setNotes(purchaseData.notes || "");
+        setSupplierInvoiceNumber(
+  purchaseData.supplierInvoiceNumber || ""
+);
+
+setExistingSupplierInvoice(
+  purchaseData.supplierInvoiceFile?.url
+    ? purchaseData.supplierInvoiceFile
+    : null
+);
+
+setSupplierInvoiceFile(null);
       } catch (err) {
         console.error("Failed to load purchase:", err);
         setError(
@@ -293,34 +340,67 @@ const handleProductChange = (index, productId) => {
     try {
       setSaving(true);
 
-      const payload = {
-        supplierId,
-        purchaseDate,
-        items: items.map((item) => ({
-          productId: item.productId,
-          quantity: Number(item.quantity),
-          purchasePrice: Number(item.purchasePrice),
-        })),
-        amountPaid: Number(amountPaid),
-        notes: notes.trim(),
-      };
+let uploadedInvoice = null;
 
-      await axios.put(`${API}/purchases/${id}`, payload);
+if (supplierInvoiceFile) {
+  uploadedInvoice =
+    await uploadSupplierInvoiceToCloudinary(supplierInvoiceFile);
+}
+const formData = new FormData();
 
+formData.append("supplierId", supplierId);
+formData.append("purchaseDate", purchaseDate);
+formData.append(
+  "items",
+  JSON.stringify(
+    items.map((item) => ({
+      productId: item.productId,
+      quantity: Number(item.quantity),
+      purchasePrice: Number(item.purchasePrice),
+    }))
+  )
+);
+formData.append("amountPaid", String(Number(amountPaid)));
+formData.append("notes", notes.trim());
+formData.append(
+  "supplierInvoiceNumber",
+  supplierInvoiceNumber.trim()
+);
+
+if (uploadedInvoice) {
+  formData.append("supplierInvoiceUrl", uploadedInvoice.url);
+  formData.append(
+    "supplierInvoicePublicId",
+    uploadedInvoice.publicId
+  );
+  formData.append(
+    "supplierInvoiceOriginalName",
+    uploadedInvoice.originalName
+  );
+  formData.append(
+    "supplierInvoiceResourceType",
+    uploadedInvoice.resourceType
+  );
+}
+
+await axios.put(`${API}/purchases/${id}`, formData);
       navigate("/purchases", {
         state: {
           success: "Purchase updated successfully.",
         },
       });
-    } catch (err) {
-      console.error("Failed to update purchase:", err);
-      setError(
-        err.response?.data?.message ||
-          "Failed to update purchase. Please try again."
-      );
-    } finally {
-      setSaving(false);
-    }
+} catch (err) {
+  console.error("Failed to update purchase:", err);
+  console.error("Error details:", err.response?.data || err.message);
+
+  setError(
+    err.response?.data?.message ||
+      err.message ||
+      "Failed to update purchase. Please try again."
+  );
+} finally {
+  setSaving(false);
+}
   };
 
   if (loading) {
@@ -441,6 +521,59 @@ const handleProductChange = (index, productId) => {
                 </div>
               </Col>
             </Row>
+            <Row className="g-3 mt-1">
+  <Col md={6}>
+    <Form.Label className="purchase-label">
+      Supplier Invoice Number (Optional)
+    </Form.Label>
+
+    <Form.Control
+      type="text"
+      value={supplierInvoiceNumber}
+      onChange={(e) =>
+        setSupplierInvoiceNumber(e.target.value)
+      }
+      placeholder="Enter supplier invoice number"
+    />
+  </Col>
+
+  <Col md={6}>
+    <Form.Label className="purchase-label">
+      Replace Supplier Invoice (Optional)
+    </Form.Label>
+
+    <Form.Control
+      type="file"
+      accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+      onChange={(e) =>
+        setSupplierInvoiceFile(e.target.files?.[0] || null)
+      }
+    />
+
+    <small className="purchase-help">
+      Leave empty to keep the existing invoice.
+    </small>
+  </Col>
+</Row>
+
+{existingSupplierInvoice?.url && (
+  <Alert variant="info" className="mt-3 mb-0">
+    Existing invoice:{" "}
+    <a
+      href={existingSupplierInvoice.url}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      View current invoice
+    </a>
+
+    {existingSupplierInvoice.originalName && (
+      <div className="mt-1">
+        <small>{existingSupplierInvoice.originalName}</small>
+      </div>
+    )}
+  </Alert>
+)}
           </Card.Body>
         </Card>
 
@@ -522,7 +655,7 @@ const handleProductChange = (index, productId) => {
   }}
   className="purchase-input"
   autoComplete="off"
-  required
+  
 />
 
 {item.productSearch?.trim() && !item.productId && (

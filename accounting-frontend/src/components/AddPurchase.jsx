@@ -273,7 +273,8 @@ try {
     uploadedInvoice = await uploadSupplierInvoiceToCloudinary(
       supplierInvoiceFile
       
-    );console.log("Cloudinary upload result:", uploadedInvoice);
+    );
+    // console.log("Cloudinary upload result:", uploadedInvoice);
   }
 
   const formData = new FormData();
@@ -316,10 +317,10 @@ try {
   }
 
   await axios.post(`${API}/purchases`, formData);
-console.log(
-  "Invoice URL being sent:",
-  formData.get("supplierInvoiceUrl")
-);
+// console.log(
+//   "Invoice URL being sent:",
+//   formData.get("supplierInvoiceUrl")
+// );
   navigate("/purchases", {
     state: { message: "Purchase created successfully." },
   });

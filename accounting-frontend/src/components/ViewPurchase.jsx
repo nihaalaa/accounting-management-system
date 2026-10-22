@@ -15,6 +15,8 @@ import {
   BsCheckCircle,
   BsClock,
   BsExclamationCircle,
+    BsDownload,
+  BsEye,
 } from "react-icons/bs";
 
 const API = import.meta.env.VITE_API_URL;
@@ -240,6 +242,45 @@ export default function ViewPurchase() {
               label="Payment Status"
               value={status}
             />
+            
+<InfoRow
+  icon={<BsFileText />}
+  label="Supplier Invoice Number"
+  value={purchase.supplierInvoiceNumber || "-"}
+/>
+
+<div style={{ ...styles.infoRow, borderBottom: "none" }}>
+  <div style={styles.infoIcon}>
+    <BsFileText />
+  </div>
+
+  <div style={styles.infoContent}>
+    <div style={styles.infoLabel}>Supplier Invoice File</div>
+
+    {purchase.supplierInvoiceFile?.url ? (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <a
+          href={purchase.supplierInvoiceFile.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "#3b6b9d", fontSize: 12 }}
+        >
+          <BsEye /> View Invoice
+        </a>
+      </div>
+    ) : (
+      <div style={styles.infoValue}>No invoice file uploaded</div>
+    )}
+  </div>
+</div>
+
           </div>
         </Card>
 
