@@ -248,7 +248,7 @@ if (supplierInvoiceFile) {
 try {
   setSaving(true);
 
-  await axios.post(`${API}/purchases`, formData);
+  await axios.post(`${import.meta.env.VITE_API_URL}/purchases`, formData);
 
 
       navigate("/purchases", {

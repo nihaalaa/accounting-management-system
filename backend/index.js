@@ -1145,10 +1145,17 @@ function uploadInvoiceToCloudinary(file) {
         folder: "accounting-system/supplier-invoices",
         resource_type: "auto",
       },
-      (error, result) => {
-        if (error) {
-          return reject(error);
-        }
+(error, result) => {
+  if (error) {
+    console.error("Cloudinary upload error details:", {
+      message: error.message,
+      http_code: error.http_code,
+      name: error.name,
+      error: error.error,
+      stack: error.stack,
+    });
+  return reject(error);
+}
 
         resolve({
           url: result.secure_url,
