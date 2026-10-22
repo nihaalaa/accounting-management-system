@@ -92,6 +92,9 @@ const EditPurchase = () => {
   const [amountPaid, setAmountPaid] = useState("0");
   const [notes, setNotes] = useState("");
 
+  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [paymentDueDate, setPaymentDueDate] = useState("");
+
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState("");
   const [supplierInvoiceFile, setSupplierInvoiceFile] = useState(null);
   const [existingSupplierInvoice, setExistingSupplierInvoice] = useState(null);
@@ -162,9 +165,28 @@ const savedItems = Array.isArray(purchaseData.items)
         setItems(
           savedItems.length ? savedItems : [{ ...initialItem }]
         );
+setAmountPaid(String(purchaseData.amountPaid ?? 0));
+setNotes(purchaseData.notes || "");
 
-        setAmountPaid(String(purchaseData.amountPaid ?? 0));
-        setNotes(purchaseData.notes || "");
+setPaymentMethod(purchaseData.paymentMethod || "Cash");
+
+const savedDueDate = purchaseData.paymentDueDate;
+
+if (savedDueDate) {
+  const parsedDueDate = new Date(savedDueDate);
+
+  setPaymentDueDate(
+    Number.isNaN(parsedDueDate.getTime())
+      ? ""
+      : `${parsedDueDate.getFullYear()}-${String(
+          parsedDueDate.getMonth() + 1
+        ).padStart(2, "0")}-${String(
+          parsedDueDate.getDate()
+        ).padStart(2, "0")}`
+  );
+} else {
+  setPaymentDueDate("");
+}
         setSupplierInvoiceNumber(
   purchaseData.supplierInvoiceNumber || ""
 );
@@ -336,7 +358,12 @@ const handleProductChange = (index, productId) => {
       );
       return;
     }
-
+if (paymentStatus !== "Paid" && !paymentDueDate) {
+  setError(
+    "Please select a payment due date for unpaid or partially paid purchases."
+  );
+  return;
+}
     try {
       setSaving(true);
 
@@ -350,6 +377,7 @@ const formData = new FormData();
 
 formData.append("supplierId", supplierId);
 formData.append("purchaseDate", purchaseDate);
+
 formData.append(
   "items",
   JSON.stringify(
@@ -361,6 +389,8 @@ formData.append(
   )
 );
 formData.append("amountPaid", String(Number(amountPaid)));
+formData.append("paymentMethod", paymentMethod);
+formData.append("paymentDueDate", paymentDueDate);
 formData.append("notes", notes.trim());
 formData.append(
   "supplierInvoiceNumber",
@@ -838,6 +868,46 @@ await axios.put(`${API}/purchases/${id}`, formData);
                 </div>
               </Col>
             </Row>
+
+<Row className="g-3 mt-3">
+  <Col md={6}>
+    <Form.Label className="purchase-label">
+      Payment Method <span>*</span>
+    </Form.Label>
+
+    <Form.Select
+      value={paymentMethod}
+      onChange={(e) => setPaymentMethod(e.target.value)}
+      required
+    >
+      <option value="Cash">Cash</option>
+      <option value="Bank Transfer">Bank Transfer</option>
+      <option value="UPI">UPI</option>
+      <option value="Card">Card</option>
+      <option value="Cheque">Cheque</option>
+      <option value="Credit">Credit</option>
+    </Form.Select>
+  </Col>
+
+  {paymentStatus !== "Paid" && (
+    <Col md={6}>
+      <Form.Label className="purchase-label">
+        Payment Due Date <span>*</span>
+      </Form.Label>
+
+      <Form.Control
+        type="date"
+        value={paymentDueDate}
+        onChange={(e) => setPaymentDueDate(e.target.value)}
+        required
+      />
+
+      <small className="purchase-help">
+        Required while a balance remains unpaid.
+      </small>
+    </Col>
+  )}
+</Row>
 
             <div className="purchase-payment-status">
               <span>Payment Status</span>

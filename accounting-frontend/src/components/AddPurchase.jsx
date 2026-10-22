@@ -300,6 +300,8 @@ try {
   );
 
   formData.append("amountPaid", String(paid));
+  formData.append("paymentMethod", paymentMethod);
+formData.append("paymentDueDate", paymentDueDate);
   formData.append("notes", notes.trim());
   formData.append(
     "supplierInvoiceNumber",
