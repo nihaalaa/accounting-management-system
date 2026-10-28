@@ -81,6 +81,11 @@ export const AddProduct = () => {
   const [hsnSearch, setHsnSearch] = useState("");
   const [hsnResults, setHsnResults] = useState([]);
   const [showHsnResults, setShowHsnResults] = useState(false);
+  const [gstRateError, setGstRateError] = useState(false);
+
+const [gstRateCandidates, setGstRateCandidates] = useState([]);
+const [gstRateLoading, setGstRateLoading] = useState(false);
+
 
   const [product, setProduct] = useState({
     name: "",
@@ -229,7 +234,12 @@ useEffect(() => {
 };
 
 
+
 const fetchGstRates = async (hsnCode) => {
+  setGstRateLoading(true);
+  setGstRateCandidates([]);
+  setGstRateError(false);
+
   try {
     const response = await axios.get(
       `${import.meta.env.VITE_API_URL}/gst-rates`,
@@ -238,9 +248,13 @@ const fetchGstRates = async (hsnCode) => {
       }
     );
 
-    console.log("GST rate candidates:", response.data);
+    setGstRateCandidates(response.data);
   } catch (error) {
     console.error("Error fetching GST rates:", error);
+    setGstRateCandidates([]);
+    setGstRateError(true);
+  } finally {
+    setGstRateLoading(false);
   }
 };
 
@@ -606,10 +620,13 @@ const fetchGstRates = async (hsnCode) => {
               ...previous,
               hsnCode: item.code,
               hsnDescription: item.description,
+                tax: "",
+
             }));
 
             setHsnSearch(`${item.code} - ${item.description}`);
             setShowHsnResults(false);
+            
             fetchGstRates(item.code);
           }}
         >
@@ -620,30 +637,75 @@ const fetchGstRates = async (hsnCode) => {
     </div>
   )}
 </Form.Group>
-                {/* Tax */}
-{/* 
-                <Form.Group>
-                  <Form.Label style={styles.label}>
-                    Tax / GST
-                    <span style={styles.required}>*</span>
-                  </Form.Label>
 
-                  <Form.Select
-                    name="tax"
-                    value={product.tax}
-                    onChange={handleChange}
-                    style={styles.input}
-                    required
-                  >
-                    <option value="">Select tax</option>
-                    <option value="0">0%</option>
-                    <option value="5">5%</option>
-                    <option value="12">12%</option>
-                    <option value="18">18%</option>
-                    <option value="28">28%</option>
-                  </Form.Select>
-                </Form.Group> */}
-              </div>
+{/* Tax */}
+<div>
+  <Form.Label>Tax</Form.Label>
+
+  <Form.Select
+    name="tax"
+    value={product.tax}
+    onChange={handleChange}
+    style={styles.input}
+    required
+    disabled={gstRateLoading || gstRateError}
+  >
+    <option value="">
+      {product.hsnCode
+        ? "Select a GST rate"
+        : "Select manual GST rate"}
+    </option>
+
+    {gstRateLoading && (
+      <option value="" disabled>
+        Loading GST rates...
+      </option>
+    )}
+
+    {(
+      !product.hsnCode ||
+      (
+        !gstRateLoading &&
+        !gstRateError &&
+        gstRateCandidates.length === 0
+      )
+    ) && (
+      <>
+        <option value="0">0%</option>
+        <option value="5">5%</option>
+        <option value="12">12%</option>
+        <option value="18">18%</option>
+        <option value="28">28%</option>
+      </>
+    )}
+
+    {product.hsnCode &&
+      !gstRateLoading &&
+      !gstRateError &&
+      gstRateCandidates.length === 0 && (
+        <option value="" disabled>
+          No rate found — verify GST manually
+        </option>
+      )}
+
+    {product.hsnCode &&
+      gstRateCandidates.map((rate, index) => (
+        <option
+          key={`${rate.code}-${rate.gstPercent}-${index}`}
+          value={rate.gstPercent}
+        >
+          {rate.gstPercent}% — {rate.condition || "Condition not specified"}
+        </option>
+      ))}
+  </Form.Select>
+
+  {gstRateError && (
+    <Form.Text className="text-danger">
+      Could not fetch GST rates. Please select the HSN code again to retry.
+    </Form.Text>
+  )}
+</div>
+</div>
 
               {/* Loss Warning */}
 

@@ -861,7 +861,7 @@ const dueDate = invoice.dueDate;
                     pdfStyles.tableText,
                   ]}
                 >
-                  {formatCurrency(tax)}
+                  {`${tax}%`}
                 </Text>
 
 
@@ -930,7 +930,7 @@ const dueDate = invoice.dueDate;
               </Text>
 
               <Text style={pdfStyles.totalValue}>
-{formatCurrency(invoice.taxAmount ?? invoice.tax ?? 0)}           </Text>
+{formatCurrency(invoice.taxAmount ?? invoice.tax ?? 0)}        </Text>
 
             </View>
 
@@ -1039,9 +1039,9 @@ useEffect(() => {
           `${import.meta.env.VITE_API_URL}/invoices/${id}`
         );
 
-        setInvoice(response.data);
+console.log("API invoice response:", response.data);
 
-      } catch (error) {
+setInvoice(response.data.invoice ?? response.data);      } catch (error) {
 
         console.error(
           "Error fetching invoice:",
@@ -2377,9 +2377,7 @@ const paymentBadgeStyle = getPaymentBadge(paymentStatus);
                                   "right",
                               }}
                             >
-                              {formatCurrency(
-                                tax
-                              )}
+{`${tax}%`}
                             </td>
 
 
@@ -2394,9 +2392,7 @@ const paymentBadgeStyle = getPaymentBadge(paymentStatus);
                                   "#303844",
                               }}
                             >
-                              {formatCurrency(
-                                amount
-                              )}
+{`${tax}%`}
                             </td>
 
                           </tr>
@@ -2498,13 +2494,13 @@ const paymentBadgeStyle = getPaymentBadge(paymentStatus);
                       Tax
                     </span>
 
-                    <span
-                      style={totalValueStyle}
-                    >
-                      {formatCurrency(
-                        invoice.tax
-                      )}
-                    </span>
+<span
+  style={totalValueStyle}
+>
+  {formatCurrency(
+    invoice.taxAmount ?? invoice.tax ?? 0
+  )}
+</span>
 
                   </div>
 
