@@ -7,6 +7,7 @@ const multer = require("multer");
 
 const path = require("path");
 const hsnData = require("./data/hsn-directory.json");
+const gstRateData = require("./data/gst-rate-directory.json");
 
 require("dotenv").config();
 
@@ -211,7 +212,42 @@ app.get("/hsn", (req, res) => {
     res.status(500).json({ message: "Failed to search HSN codes." });
   }
 });
-  
+
+
+/* SEARCH GST RATE CANDIDATES */
+app.get("/gst-rates", (req, res) => {
+  try {
+    const search = (req.query.search || "").trim();
+
+    if (!search) {
+      return res.json([]);
+    }
+
+    const results = gstRateData
+      .filter(
+        (item) =>
+          item.type?.toLowerCase() === "hsn" &&
+          item.code?.toString() === search
+      )
+      .map((item) => ({
+        code: item.code,
+        description: item.description,
+        gstPercent: item.gstPercent,
+        condition: item.condition,
+        notificationNo: item.notificationNo,
+        asOf: item.asOf,
+      }));
+
+    res.json(results);
+  } catch (error) {
+    console.error("GST rate search error:", error);
+
+    res.status(500).json({
+      message: "Failed to search GST rates.",
+    });
+  }
+});
+
 app.delete("/products/:id", async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);

@@ -228,6 +228,23 @@ useEffect(() => {
   }
 };
 
+
+const fetchGstRates = async (hsnCode) => {
+  try {
+    const response = await axios.get(
+      `${import.meta.env.VITE_API_URL}/gst-rates`,
+      {
+        params: { search: hsnCode },
+      }
+    );
+
+    console.log("GST rate candidates:", response.data);
+  } catch (error) {
+    console.error("Error fetching GST rates:", error);
+  }
+};
+
+
   /* =========================================================
      SUBMIT
   ========================================================= */
@@ -593,6 +610,7 @@ useEffect(() => {
 
             setHsnSearch(`${item.code} - ${item.description}`);
             setShowHsnResults(false);
+            fetchGstRates(item.code);
           }}
         >
           <strong>{item.code}</strong>
@@ -602,10 +620,9 @@ useEffect(() => {
     </div>
   )}
 </Form.Group>
-
                 {/* Tax */}
-
-                {/* <Form.Group>
+{/* 
+                <Form.Group>
                   <Form.Label style={styles.label}>
                     Tax / GST
                     <span style={styles.required}>*</span>
