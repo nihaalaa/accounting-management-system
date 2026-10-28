@@ -78,12 +78,18 @@ export const AddProduct = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const [hsnSearch, setHsnSearch] = useState("");
+  const [hsnResults, setHsnResults] = useState([]);
+  const [showHsnResults, setShowHsnResults] = useState(false);
+
   const [product, setProduct] = useState({
     name: "",
     code: "",
     category: "",
     purchasePrice: "",
     sellingPrice: "",
+    hsnCode: "",
+    hsnDescription: "",
     tax: "",
     unit: "",
     openingStock: "",
@@ -195,6 +201,32 @@ useEffect(() => {
       image: "",
     }));
   };
+//HSNSERCH
+  const searchHsnCodes = async (value) => {
+  setHsnSearch(value);
+
+  if (!value.trim()) {
+    setHsnResults([]);
+    setShowHsnResults(false);
+    return;
+  }
+
+  try {
+    const response = await axios.get(
+      `${import.meta.env.VITE_API_URL}/hsn`,
+      {
+        params: { search: value },
+      }
+    );
+
+    setHsnResults(response.data);
+    setShowHsnResults(true);
+  } catch (error) {
+    console.error("Error searching HSN codes:", error);
+    setHsnResults([]);
+    setShowHsnResults(false);
+  }
+};
 
   /* =========================================================
      SUBMIT
@@ -531,9 +563,49 @@ useEffect(() => {
                   </div>
                 </Form.Group>
 
+<Form.Group className="mb-3">
+  <Form.Label>Search HSN Code</Form.Label>
+
+  <Form.Control
+    type="text"
+    placeholder="Search by HSN code or description"
+    value={hsnSearch}
+    onChange={(e) => searchHsnCodes(e.target.value)}
+    autoComplete="off"
+  />
+
+  {showHsnResults && hsnResults.length > 0 && (
+    <div
+      className="border rounded mt-1"
+      style={{ maxHeight: "220px", overflowY: "auto" }}
+    >
+      {hsnResults.map((item) => (
+        <div
+          key={item.code}
+          className="p-2 border-bottom"
+          style={{ cursor: "pointer" }}
+          onClick={() => {
+            setProduct((previous) => ({
+              ...previous,
+              hsnCode: item.code,
+              hsnDescription: item.description,
+            }));
+
+            setHsnSearch(`${item.code} - ${item.description}`);
+            setShowHsnResults(false);
+          }}
+        >
+          <strong>{item.code}</strong>
+          <div className="small text-muted">{item.description}</div>
+        </div>
+      ))}
+    </div>
+  )}
+</Form.Group>
+
                 {/* Tax */}
 
-                <Form.Group>
+                {/* <Form.Group>
                   <Form.Label style={styles.label}>
                     Tax / GST
                     <span style={styles.required}>*</span>
@@ -553,7 +625,7 @@ useEffect(() => {
                     <option value="18">18%</option>
                     <option value="28">28%</option>
                   </Form.Select>
-                </Form.Group>
+                </Form.Group> */}
               </div>
 
               {/* Loss Warning */}

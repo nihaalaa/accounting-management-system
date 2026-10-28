@@ -5,6 +5,9 @@ const mongoose=require("mongoose");
 const cloudinary = require("cloudinary").v2;
 const multer = require("multer");
 
+const path = require("path");
+const hsnData = require("./data/hsn-directory.json");
+
 require("dotenv").config();
 
 const app = express();
@@ -185,6 +188,30 @@ app.get("/products/:id", async (req, res) => {
   }
 });
 
+// SEARCH HSN CODES
+app.get("/hsn", (req, res) => {
+  try {
+    const search = (req.query.search || "").trim().toLowerCase();
+
+    if (!search) {
+      return res.json([]);
+    }
+
+    const results = hsnData
+      .filter(
+        (item) =>
+          item.code.toLowerCase().includes(search) ||
+          item.description.toLowerCase().includes(search)
+      )
+      .slice(0, 20);
+
+    res.json(results);
+  } catch (error) {
+    console.error("HSN search error:", error);
+    res.status(500).json({ message: "Failed to search HSN codes." });
+  }
+});
+  
 app.delete("/products/:id", async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);

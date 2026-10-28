@@ -33,6 +33,18 @@ const productSchema = new mongoose.Schema(
       min: 0,
     },
 
+    hsnCode: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    hsnDescription: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     tax: {
       type: Number,
       required: true,
