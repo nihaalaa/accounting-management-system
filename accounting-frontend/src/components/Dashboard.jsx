@@ -16,47 +16,73 @@ import {
   BsPlus,
   BsReceipt,
   BsWallet2,
+  BsBell,
+  BsExclamationTriangle,
 } from "react-icons/bs";
 
 export const Dashboard = () => {
   const [invoices, setInvoices] = useState([]);
   const [expenses, setExpenses] = useState([]);
 
+  const [products, setProducts] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // --------------------------------------------------
   // FETCH DATA
   // --------------------------------------------------
 
-  const fetchDashboardData = async () => {
+const fetchDashboardData = async () => {
+  try {
+    setLoading(true);
+    setError("");
+
+    const [invoiceResponse, expenseResponse] = await Promise.all([
+      axios.get(`${import.meta.env.VITE_API_URL}/invoices`),
+      axios.get(`${import.meta.env.VITE_API_URL}/expenses`),
+    ]);
+
+    setInvoices(
+      Array.isArray(invoiceResponse.data)
+        ? invoiceResponse.data
+        : invoiceResponse.data.invoices || []
+    );
+
+    setExpenses(
+      Array.isArray(expenseResponse.data)
+        ? expenseResponse.data
+        : expenseResponse.data.expenses || []
+    );
+
+    // Fetch products for notifications
     try {
-      setLoading(true);
-      setError("");
-
-      const [invoiceResponse, expenseResponse] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_API_URL}/invoices`),
-        axios.get(`${import.meta.env.VITE_API_URL}/expenses`),
-      ]);
-
-      setInvoices(
-        Array.isArray(invoiceResponse.data)
-          ? invoiceResponse.data
-          : invoiceResponse.data.invoices || []
+      const productResponse = await axios.get(
+        `${import.meta.env.VITE_API_URL}/products`
       );
 
-      setExpenses(
-        Array.isArray(expenseResponse.data)
-          ? expenseResponse.data
-          : expenseResponse.data.expenses || []
+      setProducts(
+        Array.isArray(productResponse.data)
+          ? productResponse.data
+          : productResponse.data?.products || []
       );
-    } catch (err) {
-      console.error("Dashboard fetch error:", err);
-      setError("Unable to load dashboard data.");
-    } finally {
-      setLoading(false);
+    } catch (productError) {
+      console.error(
+        "Failed to load products for notifications:",
+        productError
+      );
+
+      setProducts([]);
     }
-  };
+  } catch (err) {
+    console.error("Dashboard fetch error:", err);
+    setError("Unable to load dashboard data.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchDashboardData();
@@ -117,6 +143,7 @@ export const Dashboard = () => {
       date.getFullYear() === currentYear
     );
   };
+  
 
   // --------------------------------------------------
   // FORMATTERS
@@ -129,17 +156,63 @@ export const Dashboard = () => {
     })}`;
   };
 
-  const formatDate = (value) => {
-    const date = parseDate(value);
+ 
+const formatDate = (value) => {
+  const date = parseDate(value);
 
-    if (!date) return "-";
+  if (!date) return "-";
 
-    return date.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+// NOTIFICATION CALCULATIONS
+const notificationData = useMemo(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const next30Days = new Date(today);
+  next30Days.setDate(next30Days.getDate() + 30);
+
+  const lowStock = products.filter((product) => {
+    const stock = Number(product.currentStock ?? 0);
+    const minimum = Number(product.minimumStock ?? 0);
+
+    return stock <= minimum;
+  });
+
+  const expiringSoon = products.filter((product) => {
+    if (!product.expiryDate) return false;
+
+    const expiryDate = parseDate(product.expiryDate);
+    if (!expiryDate) return false;
+
+    expiryDate.setHours(0, 0, 0, 0);
+
+    return expiryDate >= today && expiryDate <= next30Days;
+  });
+
+  const expired = products.filter((product) => {
+    if (!product.expiryDate) return false;
+
+    const expiryDate = parseDate(product.expiryDate);
+    if (!expiryDate) return false;
+
+    expiryDate.setHours(0, 0, 0, 0);
+
+    return expiryDate < today;
+  });
+
+  return {
+    lowStock,
+    expiringSoon,
+    expired,
+    total: lowStock.length + expiringSoon.length + expired.length,
   };
+}, [products]);
 
   const formatShortDate = (value) => {
     const date = parseDate(value);
@@ -399,18 +472,188 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        <div style={styles.headerDate}>
-          <BsCalendar3 size={15} />
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+  }}
+>
+  {/* Notification bell */}
+  <div style={{ position: "relative" }}>
+    <button
+      type="button"
+      onClick={() =>
+        setShowNotifications((previous) => !previous)
+      }
+      aria-label="Toggle notifications"
+      aria-expanded={showNotifications}
+      style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "42px",
+        height: "42px",
+        border: "1px solid #dbe3ec",
+        borderRadius: "10px",
+        background: "#ffffff",
+        color: "#3b6b9d",
+        cursor: "pointer",
+      }}
+    >
+      <BsBell size={20} />
 
-          <span>
-            {today.toLocaleDateString("en-IN", {
-              weekday: "long",
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })}
-          </span>
-        </div>
+      {notificationData.total > 0 && (
+        <span
+          style={{
+            position: "absolute",
+            top: "-6px",
+            right: "-6px",
+            minWidth: "19px",
+            height: "19px",
+            padding: "0 4px",
+            borderRadius: "12px",
+            background: "#dc3545",
+            color: "#ffffff",
+            fontSize: "11px",
+            fontWeight: "700",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {notificationData.total > 99
+            ? "99+"
+            : notificationData.total}
+        </span>
+      )}
+    </button>
+
+    {/* Notification dropdown */}
+    {showNotifications && (
+      <div
+        style={{
+          position: "absolute",
+          top: "50px",
+          right: 0,
+          width: "340px",
+          maxWidth: "calc(100vw - 32px)",
+          maxHeight: "70vh",
+          overflowY: "auto",
+          background: "#ffffff",
+          border: "1px solid #dbe3ec",
+          borderRadius: "12px",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.14)",
+          zIndex: 1000,
+          padding: "16px",
+          color: "#263445",
+        }}
+      >
+        <h5 style={{ margin: "0 0 14px", fontWeight: "700" }}>
+          Notifications ({notificationData.total})
+        </h5>
+
+        {notificationData.lowStock.length > 0 && (
+          <div style={{ marginBottom: "16px" }}>
+            <h6 style={{ color: "#dc3545", fontWeight: "700" }}>
+              <BsExclamationTriangle /> Low Stock (
+              {notificationData.lowStock.length})
+            </h6>
+
+            {notificationData.lowStock.map((product) => (
+              <div
+                key={`low-${product._id}`}
+                style={{
+                  padding: "8px 0",
+                  borderBottom: "1px solid #edf0f4",
+                  fontSize: "13px",
+                }}
+              >
+                <strong>{product.name}</strong>
+                <div>
+                  Stock: {product.currentStock ?? 0} · Minimum:{" "}
+                  {product.minimumStock ?? 0}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {notificationData.expiringSoon.length > 0 && (
+          <div style={{ marginBottom: "16px" }}>
+            <h6 style={{ color: "#b7791f", fontWeight: "700" }}>
+              Expiring Soon ({notificationData.expiringSoon.length})
+            </h6>
+
+            {notificationData.expiringSoon.map((product) => (
+              <div
+                key={`soon-${product._id}`}
+                style={{
+                  padding: "8px 0",
+                  borderBottom: "1px solid #edf0f4",
+                  fontSize: "13px",
+                }}
+              >
+                <strong>{product.name}</strong>
+                <div>
+                  Expires:{" "}
+                  {parseDate(product.expiryDate)?.toLocaleDateString("en-IN") ||
+                    "Unknown"}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {notificationData.expired.length > 0 && (
+          <div>
+            <h6 style={{ color: "#dc3545", fontWeight: "700" }}>
+              Expired ({notificationData.expired.length})
+            </h6>
+
+            {notificationData.expired.map((product) => (
+              <div
+                key={`expired-${product._id}`}
+                style={{
+                  padding: "8px 0",
+                  borderBottom: "1px solid #edf0f4",
+                  fontSize: "13px",
+                }}
+              >
+                <strong>{product.name}</strong>
+                <div>
+                  Expired on:{" "}
+                  {parseDate(product.expiryDate)?.toLocaleDateString("en-IN") ||
+                    "Unknown"}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {notificationData.total === 0 && (
+          <p style={{ fontSize: "13px", color: "#6c757d", margin: 0 }}>
+            No notifications.
+          </p>
+        )}
+      </div>
+    )}
+</div>
+  {/* Existing dashboard date */}
+  <div style={styles.headerDate}>
+    <BsCalendar3 size={15} />
+    <span>
+      {today.toLocaleDateString("en-IN", {
+        weekday: "long",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })}
+    </span>
+  </div>
+</div>
+
       </div>
 
       {/* QUICK ACTIONS */}

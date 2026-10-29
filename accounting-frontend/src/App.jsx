@@ -26,6 +26,7 @@ import Purchases from "./components/Purchases";
 import ViewPurchase from "./components/ViewPurchase";
 import AddPurchase from "./components/AddPurchase";
 import EditPurchase from "./components/EditPurchase";
+import { ViewProduct } from "./components/ViewProduct";
 
 function App() {
    return (
@@ -40,6 +41,7 @@ function App() {
             <Route path='/categories/add' element={<AddCategory />}/>
             <Route path='/products' element={<Products />} />
             <Route path='/products/add' element={<AddProduct />}/>
+            <Route path="/products/view/:id" element={<ViewProduct />}/>
             <Route path='/products/edit/:id' element={<EditProduct />}/>
             <Route path='/categories/edit/:id' element={<EditCategory />}/>
             <Route path="/expenses" element={<Expenses />} />

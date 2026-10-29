@@ -16,7 +16,7 @@ import {
   BsFunnel,
   BsChevronLeft,
   BsChevronRight,
-
+  BsEye,
   BsArrowLeft,
   BsPlusCircle,
 } from "react-icons/bs";
@@ -415,6 +415,10 @@ const handleSaveStockAdjustment = async () => {
     }
   };
 
+  //VIEW
+  const handleView = (id) => {
+  navigate(`/products/view/${id}`);
+};
   /* =======================================================
      EDIT
   ======================================================= */
@@ -1122,7 +1126,13 @@ const handleSaveStockAdjustment = async () => {
                       >
 
                         <div style={styles.actions}>
-
+<button
+  onClick={() => handleView(product._id)}
+  style={styles.editAction}
+  title="View product"
+>
+  <BsEye size={14} />
+</button>
                           <button
                             onClick={() =>
                               handleEdit(product._id)
@@ -1130,8 +1140,7 @@ const handleSaveStockAdjustment = async () => {
                             style={styles.editAction}
                             title="Edit product"
                           >
-                            <BsPencil size={12} />
-                            Edit
+                            <BsPencil size={14} />
                           </button>
 
                           <button
@@ -1141,7 +1150,7 @@ const handleSaveStockAdjustment = async () => {
                             style={styles.deleteAction}
                             title="Delete product"
                           >
-                            <BsTrash size={13} />
+                            <BsTrash size={14} />
                           </button>
 
                         </div>

@@ -94,6 +94,7 @@ export const EditProduct = () => {
     unit: "",
     openingStock: "",
     minimumStock: "",
+    expiryDate: "",
     description: "",
     image: "",
   });
@@ -136,6 +137,9 @@ export const EditProduct = () => {
             data.minimumStock !== undefined
               ? data.minimumStock
               : "",
+              expiryDate: data.expiryDate
+  ? String(data.expiryDate).slice(0, 10)
+  : "",
           description: data.description || "",
           image: data.image || "",
         });
@@ -887,7 +891,19 @@ export const EditProduct = () => {
                     Products at or below this level show as low stock.
                   </div>
                 </Form.Group>
+<Form.Group>
+  <Form.Label style={styles.label}>
+    Expiry date
+  </Form.Label>
 
+  <Form.Control
+    type="date"
+    name="expiryDate"
+    value={product.expiryDate}
+    onChange={handleChange}
+    style={styles.input}
+  />
+</Form.Group>
               </div>
 
               {/* STOCK STATUS */}
