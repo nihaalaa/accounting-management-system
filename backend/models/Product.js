@@ -47,7 +47,6 @@ const productSchema = new mongoose.Schema(
 
     tax: {
       type: Number,
-      required: true,
       min: 0,
     },
 
@@ -70,6 +69,11 @@ const productSchema = new mongoose.Schema(
     minimumStock: {
       type: Number,
      },
+
+     expiryDate: {
+      type: Date,
+      default: null,
+    },
 
     description: {
       type: String,

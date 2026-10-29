@@ -99,6 +99,7 @@ const [gstRateLoading, setGstRateLoading] = useState(false);
     unit: "",
     openingStock: "",
     minimumStock: "",
+    expiryDate: "",
     description: "",
     image: "",
   });
@@ -647,7 +648,7 @@ const fetchGstRates = async (hsnCode) => {
     value={product.tax}
     onChange={handleChange}
     style={styles.input}
-    required
+    
     disabled={gstRateLoading || gstRateError}
   >
     <option value="">
@@ -773,6 +774,21 @@ const fetchGstRates = async (hsnCode) => {
                     low stock.
                   </div>
                 </Form.Group>
+                
+<Form.Group>
+  <Form.Label style={styles.label}>
+    Expiry date
+  </Form.Label>
+
+  <Form.Control
+    type="date"
+    name="expiryDate"
+    value={product.expiryDate}
+    onChange={handleChange}
+    style={styles.input}
+  />
+</Form.Group>
+
               </div>
             </Section>
 
