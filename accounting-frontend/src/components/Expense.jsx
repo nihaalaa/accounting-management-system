@@ -5,6 +5,7 @@ import {
   BsPlus,
   BsPencil,
   BsTrash,
+  BsEye,
 } from "react-icons/bs";
 import axios from "axios";
 
@@ -397,12 +398,19 @@ const filteredExpenses = expenses.filter((expense) => {
 
                     <td style={tdStyle}>
 
+<Link
+  to={`/expenses/view/${expense._id}`}
+  style={viewButtonStyle}
+  title="View"
+>
+  <BsEye size={13}/>
+</Link>
                       <Link
                         to={`/expenses/edit/${expense._id}`}
                         style={editButtonStyle}
                         title="Edit"
                       >
-                        <BsPencil />
+                        <BsPencil size={13} />
                       </Link>
 
 
@@ -415,7 +423,7 @@ const filteredExpenses = expenses.filter((expense) => {
                           )
                         }
                       >
-                        <BsTrash />
+                        <BsTrash size={13} />
                       </button>
 
                     </td>
@@ -780,21 +788,33 @@ const emptyTextStyle = {
 ========================= */
 
 const editButtonStyle = {
-  border: "none",
-  background: "transparent",
-  color: "#4b6985",
-  cursor: "pointer",
-  marginRight: "10px",
-  fontSize: "15px",
-  textDecoration: "none",
+    height: "30px",
+    padding: "0 10px",
+    border: "1px solid #d8dfe7",
+    backgroundColor: "#ffffff",
+    color: "#3b6b9d",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "5px",
+    fontSize: "11px",
+    fontWeight: "600",
+    borderRadius: "6px",
+    cursor: "pointer",
 };
 
 const deleteButtonStyle = {
-  border: "none",
-  background: "transparent",
+  border: "1px solid #fecaca",
+  backgroundColor: "#fffafa",
   color: "#dc2626",
-  cursor: "pointer",
-  fontSize: "15px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "5px",
+  borderRadius: "6px",
+  fontSize: "11px",
+  fontWeight: "500",
+  padding: "6px 10px",
 };
 
 
@@ -832,4 +852,20 @@ const pageNumberStyle = {
   height: "30px",
   fontSize: "11px",
   cursor: "pointer",
+};
+
+const viewButtonStyle = {
+    height: "30px",
+    padding: "0 10px",
+    border: "1px solid #d8dfe7",
+    backgroundColor: "#ffffff",
+    color: "#3b6b9d",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "5px",
+    fontSize: "11px",
+    fontWeight: "600",
+    borderRadius: "6px",
+    cursor: "pointer",
 };

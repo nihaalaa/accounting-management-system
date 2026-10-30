@@ -127,11 +127,12 @@ export const ViewCategory = () => {
           <hr style={dividerStyle} />
 
           <div style={footerStyle}>
-            <Button
-              style={backButton}
-              onClick={() => navigate("/categories")}
+                    <Button
+              variant="secondary"
+              onClick={() => navigate(-1)}
+              style={backButtonStyle}
             >
-              <BsArrowLeft /> Back to Categories
+              Close
             </Button>
 
             <Button
@@ -277,3 +278,21 @@ const editButton = {
   fontSize: "12px",
   padding: "8px 13px",
 };
+
+  const backButtonStyle = {
+    height: "38px",
+    padding: "0 13px",
+    borderRadius: "6px",
+    border: "1px solid #d9e0e6",
+    backgroundColor: "#ffffff",
+    color: "#4b5563",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "7px",
+    fontSize: "12px",
+    fontWeight: "600",
+    whiteSpace: "nowrap",
+    boxShadow:
+      "0 1px 2px rgba(15,23,42,0.03)",
+  };

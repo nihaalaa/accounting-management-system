@@ -2333,17 +2333,17 @@ const styles = {
   },
 
   deleteAction: {
-    width: "30px",
-    height: "30px",
-    padding: 0,
-    border: "1px solid #efcccc",
-    backgroundColor: "#ffffff",
-    color: "#b91c1c",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "6px",
-    cursor: "pointer",
+  border: "1px solid #fecaca",
+  backgroundColor: "#fffafa",
+  color: "#dc2626",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "5px",
+  borderRadius: "6px",
+  fontSize: "11px",
+  fontWeight: "500",
+  padding: "6px 10px",
   },
 
   /* =======================================================

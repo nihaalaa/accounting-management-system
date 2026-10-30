@@ -28,6 +28,7 @@ import AddPurchase from "./components/AddPurchase";
 import EditPurchase from "./components/EditPurchase";
 import { ViewProduct } from "./components/ViewProduct";
 import { ViewCategory } from "./components/ViewCategory";
+import { ViewExpense } from "./components/ViewExpense";
 
 function App() {
    return (
@@ -40,31 +41,36 @@ function App() {
             <Route path='/' element={<Dashboard />}/>
             <Route path='/categories' element={<Categories />}/>     
             <Route path='/categories/add' element={<AddCategory />}/>
+            <Route path='/categories/edit/:id' element={<EditCategory />}/>
+            <Route path="/categories/view/:id" element={<ViewCategory />}/>
+
             <Route path='/products' element={<Products />} />
             <Route path='/products/add' element={<AddProduct />}/>
             <Route path="/products/view/:id" element={<ViewProduct />}/>
             <Route path='/products/edit/:id' element={<EditProduct />}/>
-            <Route path='/categories/edit/:id' element={<EditCategory />}/>
-            <Route path="/categories/view/:id" element={<ViewCategory />}/>
-            <Route path="/expenses" element={<Expenses />} />
+
             <Route path='/customers' element={<Customers />} />
             <Route path='/customers/add' element={<AddCustomers />}/>
             <Route path='/customers/edit/:id' element={<EditCustomers />}/>
             <Route path='/customers/view/:id' element={<ViewCustomer />} />
-            <Route path="/suppliers" element={<Suppliers />} />
-            <Route path="/suppliers/add" element={<AddSupplier />} />
-            <Route path="/purchases" element={<Purchases />} />
 
-            <Route path="/expenses/add" element={<AddExpense />} />
-            <Route path="/expenses/edit/:id" element={<EditExpense />}/>
-            <Route path="/invoices" element={<Invoices />} />
-            <Route path="/invoices/add" element={<AddInvoice />} />
-            <Route path="/invoices/view/:id" element={<ViewInvoice />} />
-            <Route path="/invoices/edit/:id" element={<EditInvoice />} />
-            <Route path="/purchases" element={<Purchases />}/>
-            <Route path="/purchases/add" element={<AddPurchase />} />
-            <Route path="/purchases/view/:id" element={<ViewPurchase />} />
-            <Route path="/purchases/edit/:id" element={<EditPurchase />} />
+            <Route path='/suppliers' element={<Suppliers />} />
+            <Route path="/suppliers/add" element={<AddSupplier />} />
+
+            <Route path='/expenses' element={<Expenses />} />
+            <Route path='/expenses/add' element={<AddExpense />} />
+            <Route path='/expenses/edit/:id' element={<EditExpense />}/>
+            <Route path='/expenses/view/:id' element={<ViewExpense />}/>
+
+            <Route path='/invoices' element={<Invoices />} />
+            <Route path='/invoices/add' element={<AddInvoice />} />
+            <Route path='/invoices/view/:id' element={<ViewInvoice />} />
+            <Route path='/invoices/edit/:id' element={<EditInvoice />} />
+
+            <Route path='/purchases' element={<Purchases />}/>
+            <Route path='/purchases/add' element={<AddPurchase />} />
+            <Route path= '/purchases/view/:id' element={<ViewPurchase />} />
+            <Route path='/purchases/edit/:id' element={<EditPurchase />} />
 
         </Routes>
       </div>

@@ -26,7 +26,7 @@ export const Sidebar = () => {
     { name: "Expenses", path: "/expenses", icon: <BsCashStack /> },
     { name: "Purchases", path: "/purchases", icon: <BsBagCheck /> },
     { name: "Suppliers", path: "/suppliers", icon: <BsTruck /> },
-    { name: "Reports", path: "/reports", icon: <BsBarChart /> },
+    // { name: "Reports", path: "/reports", icon: <BsBarChart /> },
   ];
 
   return (

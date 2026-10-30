@@ -949,17 +949,19 @@ const actions = {
 };
 
 const editButton = {
-  border: "1px solid #dbe2ea",
-  backgroundColor: "#ffffff",
-  color: "#475569",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "5px",
-  borderRadius: "6px",
-  fontSize: "11px",
-  fontWeight: "500",
-  padding: "6px 10px",
+    height: "30px",
+    padding: "0 10px",
+    border: "1px solid #d8dfe7",
+    backgroundColor: "#ffffff",
+    color: "#3b6b9d",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "5px",
+    fontSize: "11px",
+    fontWeight: "600",
+    borderRadius: "6px",
+    cursor: "pointer",
 };
 
 const deleteButton = {
@@ -977,17 +979,19 @@ const deleteButton = {
 };
 
 const viewButton = {
-  border: "1px solid #dbeafe",
-  backgroundColor: "#f0f7ff",
-  color: "#3b6b9d",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "5px",
-  borderRadius: "6px",
-  fontSize: "11px",
-  fontWeight: "500",
-  padding: "6px 10px",
+    height: "30px",
+    padding: "0 10px",
+    border: "1px solid #d8dfe7",
+    backgroundColor: "#ffffff",
+    color: "#3b6b9d",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "5px",
+    fontSize: "11px",
+    fontWeight: "600",
+    borderRadius: "6px",
+    cursor: "pointer",
 };
 
 /* ============================================================

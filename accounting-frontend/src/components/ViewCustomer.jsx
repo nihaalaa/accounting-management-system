@@ -514,6 +514,15 @@ const outstandingBalance = invoices.reduce(
           </Table>
         </div>
       </Card>
+                <div style={footerStyle}>
+
+                              <Button
+                  variant="secondary"
+                  onClick={() => navigate(-1)}
+                  style={backButtonStyle}
+                >
+                  Close
+                </Button></div>
     </div>
   );
 };
@@ -838,4 +847,26 @@ const loadingStyle = {
   fontSize: 13,
 };
 
+  const backButtonStyle = {
+    height: "38px",
+    padding: "0 13px",
+    borderRadius: "6px",
+    border: "1px solid #d9e0e6",
+    backgroundColor: "#ffffff",
+    color: "#4b5563",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "7px",
+    fontSize: "12px",
+    fontWeight: "600",
+    whiteSpace: "nowrap",
+    boxShadow:
+      "0 1px 2px rgba(15,23,42,0.03)",
+  };
+const footerStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "10px",
+};
 export default ViewCustomer;
