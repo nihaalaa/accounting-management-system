@@ -2,6 +2,10 @@ import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button, Table } from "react-bootstrap";
+
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 import {
   BsPlus,
   BsPencil,
@@ -10,6 +14,7 @@ import {
   BsSearch,
   BsGrid,
     BsEye,
+    BsDownload,
 } from "react-icons/bs";
 
 export const Categories = () => {
@@ -99,6 +104,59 @@ export const Categories = () => {
       ?.toLowerCase()
       .includes(search.toLowerCase())
   );
+
+  const handleDownloadPDF = () => {
+  if (filteredCategories.length === 0) {
+    alert("No categories available to download.");
+    return;
+  }
+
+  const doc = new jsPDF("landscape");
+
+  doc.setFontSize(18);
+  doc.text("Category List", 14, 18);
+
+  doc.setFontSize(10);
+  doc.text(
+    `Total Categories: ${filteredCategories.length}`,
+    14,
+    26
+  );
+
+  doc.text(
+    `Generated On: ${new Date().toLocaleDateString("en-IN")}`,
+    14,
+    32
+  );
+
+  const tableColumn = ["Category", "Description"];
+
+  const tableRows = filteredCategories.map((category) => [
+    category.name || "",
+    "Used to organize products",
+  ]);
+
+  autoTable(doc, {
+    head: [tableColumn],
+    body: tableRows,
+    startY: 38,
+    theme: "grid",
+    styles: {
+      fontSize: 9,
+      cellPadding: 4,
+    },
+    headStyles: {
+      fillColor: [59, 107, 157],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+    alternateRowStyles: {
+      fillColor: [245, 248, 252],
+    },
+  });
+
+  doc.save("Categories.pdf");
+};
 
   // ============================
   // PAGINATION
@@ -230,26 +288,45 @@ export const Categories = () => {
 
 
           {/* ================= SEARCH ================= */}
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  }}
+>
+  <Button
+    onClick={handleDownloadPDF}
+    variant="outline-primary"
+    style={{
+      fontSize: "12px",
+      padding: "7px 12px",
+      borderRadius: "6px",
+      display: "flex",
+      alignItems: "center",
+      gap: "6px",
+      whiteSpace: "nowrap",
+    }}
+  >
+    <BsDownload size={14} />
+    Download PDF
+  </Button>
 
-          <div style={searchBox}>
+  <div style={searchBox}>
+    <BsSearch size={14} color="#94a3b8" />
 
-            <BsSearch
-              size={14}
-              color="#94a3b8"
-            />
-
-            <input
-              type="text"
-              placeholder="Search categories..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-              style={searchInput}
-            />
-
-          </div>
+    <input
+      type="text"
+      placeholder="Search categories..."
+      value={search}
+      onChange={(e) => {
+        setSearch(e.target.value);
+        setCurrentPage(1);
+      }}
+      style={searchInput}
+    />
+  </div>
+</div>
 
         </div>
 

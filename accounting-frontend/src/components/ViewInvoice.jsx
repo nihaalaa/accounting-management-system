@@ -1403,8 +1403,7 @@ const paymentBadgeStyle = getPaymentBadge(paymentStatus);
     fontSize: "12px",
     fontWeight: "600",
     whiteSpace: "nowrap",
-    boxShadow:
-      "0 1px 2px rgba(15,23,42,0.03)",
+    boxShadow: "0 1px 2px rgba(15,23,42,0.03)",
   };
 
 

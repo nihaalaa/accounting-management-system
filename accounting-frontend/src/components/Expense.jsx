@@ -6,8 +6,12 @@ import {
   BsPencil,
   BsTrash,
   BsEye,
+  BsDownload,
 } from "react-icons/bs";
 import axios from "axios";
+
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export const Expenses = () => {
 
@@ -97,6 +101,86 @@ const filteredExpenses = expenses.filter((expense) => {
     matchesToDate
   );
 });
+
+// DOWNLOAD EXPENSES PDF
+const handleDownloadPDF = () => {
+  if (filteredExpenses.length === 0) {
+    alert("No expenses available to download.");
+    return;
+  }
+
+  const doc = new jsPDF("landscape");
+
+  doc.setFontSize(18);
+  doc.text("Expense Report", 14, 18);
+
+  const filteredTotal = filteredExpenses.reduce(
+    (total, expense) => total + Number(expense.amount || 0),
+    0
+  );
+
+  doc.setFontSize(10);
+  doc.text(
+    `Total Records: ${filteredExpenses.length}`,
+    14,
+    26
+  );
+
+  doc.text(
+    `Total Amount: Rs. ${filteredTotal.toFixed(2)}`,
+    14,
+    32
+  );
+
+  doc.text(
+    `Generated On: ${new Date().toLocaleDateString("en-IN")}`,
+    14,
+    38
+  );
+
+  const tableColumn = [
+    "Expense",
+    "Category",
+    "Amount",
+    "Date",
+    "Payment Method",
+    "Description",
+  ];
+
+  const tableRows = filteredExpenses.map((expense) => [
+    expense.name || "-",
+    expense.category || "-",
+    `Rs. ${Number(expense.amount || 0).toFixed(2)}`,
+    expense.date
+      ? new Date(expense.date).toLocaleDateString("en-IN")
+      : "-",
+    expense.paymentMethod || "-",
+    expense.description || "-",
+  ]);
+
+  autoTable(doc, {
+    head: [tableColumn],
+    body: tableRows,
+    startY: 44,
+    theme: "grid",
+    styles: {
+      fontSize: 8,
+      cellPadding: 2.5,
+      overflow: "linebreak",
+    },
+    headStyles: {
+      fillColor: [59, 107, 157],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+    alternateRowStyles: {
+      fillColor: [245, 248, 252],
+    },
+  });
+
+  doc.save("Expense_Report.pdf");
+};
+
   // PAGINATION
   const indexOfLastExpense =
     currentPage * expensesPerPage;
@@ -243,8 +327,28 @@ const filteredExpenses = expenses.filter((expense) => {
           </div>
 
 {/* SEARCH + CATEGORY FILTER */}
-
 <div style={searchContainerStyle}>
+
+  <button
+    onClick={handleDownloadPDF}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "6px",
+      height: "34px",
+      padding: "0 12px",
+      border: "1px solid #3b6b9d",
+      borderRadius: "6px",
+      backgroundColor: "#3b6b9d",
+      color: "#ffffff",
+      fontSize: "12px",
+      cursor: "pointer",
+    }}
+  >
+    <BsDownload size={14} />
+    Download PDF
+  </button>
+
   <select
     value={selectedCategory}
     onChange={(e) => {

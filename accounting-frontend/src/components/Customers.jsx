@@ -2,6 +2,10 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button, Card, Table } from "react-bootstrap";
 import axios from "axios";
+
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 import {
   BsPlus,
   BsPencil,
@@ -10,6 +14,7 @@ import {
   BsSearch,
   BsPeople,
   BsEye,
+  BsDownload,
 } from "react-icons/bs";
 
 export const Customers = () => {
@@ -103,6 +108,76 @@ const filteredCustomers = customers.filter((customer) => {
   return matchesSearch && matchesType;
 });
 
+const handleDownloadPDF = () => {
+  if (filteredCustomers.length === 0) {
+    alert("No customers available to download.");
+    return;
+  }
+
+  const doc = new jsPDF("landscape");
+
+  doc.setFontSize(18);
+  doc.text("Customer List", 14, 18);
+
+  doc.setFontSize(10);
+  doc.text(
+    `Total Customers: ${filteredCustomers.length}`,
+    14,
+    26
+  );
+
+  doc.text(
+    `Generated On: ${new Date().toLocaleDateString("en-IN")}`,
+    14,
+    32
+  );
+
+  const tableColumn = [
+    "Customer",
+    "Phone",
+    "Email",
+    "Customer Type",
+    "Address",
+  ];
+
+  const tableRows = filteredCustomers.map((customer) => [
+    customer.name || "-",
+    customer.phone || "-",
+    customer.email || "-",
+    customer.customerType || "-",
+    customer.address || "-",
+  ]);
+
+  autoTable(doc, {
+    head: [tableColumn],
+    body: tableRows,
+    startY: 38,
+    theme: "grid",
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+      overflow: "linebreak",
+    },
+    headStyles: {
+      fillColor: [63, 96, 125],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+    alternateRowStyles: {
+      fillColor: [245, 248, 252],
+    },
+    columnStyles: {
+      0: { cellWidth: 40 },
+      1: { cellWidth: 30 },
+      2: { cellWidth: 45 },
+      3: { cellWidth: 40 },
+      4: { cellWidth: "auto" },
+    },
+  });
+
+  doc.save("Customers.pdf");
+};
+
   // =========================
   // PAGINATION
   // =========================
@@ -177,6 +252,23 @@ const filteredCustomers = customers.filter((customer) => {
           ========================= */}
 
           <div style={searchContainer}>
+
+<Button
+  onClick={handleDownloadPDF}
+  variant="outline-primary"
+  style={{
+    fontSize: "11px",
+    padding: "7px 10px",
+    borderRadius: "6px",
+    display: "flex",
+    alignItems: "center",
+    gap: "5px",
+    whiteSpace: "nowrap",
+  }}
+>
+  <BsDownload size={14} />
+  Download PDF
+</Button>
 
             {/* Customer Type Filter */}
 

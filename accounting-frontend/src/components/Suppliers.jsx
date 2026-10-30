@@ -11,6 +11,10 @@ import {
   Spinner,
 } from "react-bootstrap";
 import axios from "axios";
+
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 import {
   BsPlus,
   BsPencil,
@@ -19,6 +23,7 @@ import {
   BsSearch,
   BsEye,
   BsX,
+  BsDownload,
 } from "react-icons/bs";
 import { useNavigate } from "react-router-dom";
 
@@ -249,6 +254,83 @@ const filteredSuppliers = suppliers.filter((supplier) => {
   );
 });
 
+// DOWNLOAD SUPPLIERS PDF
+const handleDownloadPDF = () => {
+  if (filteredSuppliers.length === 0) {
+    alert("No suppliers available to download.");
+    return;
+  }
+
+  const doc = new jsPDF("landscape");
+
+  const formatPDFMoney = (value) =>
+    `Rs. ${Number(value || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  doc.setFontSize(18);
+  doc.text("Supplier Report", 14, 18);
+
+  doc.setFontSize(10);
+  doc.text(
+    `Total Suppliers: ${filteredSuppliers.length}`,
+    14,
+    26
+  );
+
+  doc.text(
+    `Generated On: ${new Date().toLocaleDateString("en-IN")}`,
+    14,
+    32
+  );
+
+  const tableColumn = [
+    "Supplier Name",
+    "Company Name",
+    "Phone",
+    "Email",
+    "Address",
+    "GST Number",
+    "Opening Balance",
+  ];
+
+  const tableRows = filteredSuppliers.map((supplier) => [
+    supplier.supplierName || "-",
+    supplier.companyName || "-",
+    supplier.phone || "-",
+    supplier.email || "-",
+    supplier.address || "-",
+    supplier.gstNumber || "-",
+    formatPDFMoney(supplier.openingBalance),
+  ]);
+
+  autoTable(doc, {
+    head: [tableColumn],
+    body: tableRows,
+    startY: 38,
+    theme: "grid",
+    styles: {
+      fontSize: 7,
+      cellPadding: 2.5,
+      overflow: "linebreak",
+    },
+    headStyles: {
+      fillColor: [59, 107, 157],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+    alternateRowStyles: {
+      fillColor: [245, 248, 252],
+    },
+    columnStyles: {
+      4: { cellWidth: 55 },
+    },
+  });
+
+  doc.save("Supplier_Report.pdf");
+};
+
 // SORT SUPPLIERS: OLDEST FIRST, NEWEST LAST
 const sortedSuppliers = [...filteredSuppliers].sort((a, b) => {
   return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
@@ -371,8 +453,28 @@ const currentSuppliers = sortedSuppliers.slice(
             </p>
           </div>
 
-          <div style={searchContainer}>
-            <div style={searchBox}>
+<div style={searchContainer}>
+
+  <Button
+    type="button"
+    onClick={handleDownloadPDF}
+    style={{
+      border: 0,
+      background: "#3b6b9d",
+      borderRadius: 6,
+      padding: "8px 12px",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      fontSize: 11,
+      whiteSpace: "nowrap",
+    }}
+  >
+    <BsDownload size={14} />
+    Download PDF
+  </Button>
+
+  <div style={searchBox}>
               <BsSearch size={15} color="#7b8794" />
 
               <input

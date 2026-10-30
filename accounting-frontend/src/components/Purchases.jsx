@@ -3,6 +3,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button, Card, Table, Spinner } from "react-bootstrap";
 import axios from "axios";
+
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 import {
   BsPlus,
   BsBagCheck,
@@ -13,6 +17,7 @@ import {
   BsEye,
   BsPencil,
   BsTrash,
+  BsDownload,
 } from "react-icons/bs";
 
 const API = import.meta.env.VITE_API_URL;
@@ -93,6 +98,109 @@ const filtered = useMemo(() => {
       );
     });
 }, [purchases, search]);
+
+// DOWNLOAD PURCHASES PDF
+const handleDownloadPDF = () => {
+  if (filtered.length === 0) {
+    alert("No purchases available to download.");
+    return;
+  }
+
+  const doc = new jsPDF("landscape");
+
+  doc.setFontSize(18);
+  doc.text("Purchase Report", 14, 18);
+
+  const filteredTotal = filtered.reduce(
+    (sum, purchase) =>
+      sum + Number(purchase.grandTotal || 0),
+    0
+  );
+
+  const filteredPaid = filtered.reduce(
+    (sum, purchase) =>
+      sum + Number(purchase.amountPaid || 0),
+    0
+  );
+
+  const filteredBalance = filtered.reduce(
+    (sum, purchase) =>
+      sum +
+      Math.max(
+        0,
+        Number(purchase.grandTotal || 0) -
+          Number(purchase.amountPaid || 0)
+      ),
+    0
+  );
+
+  const formatPDFMoney = (value) =>
+    `Rs. ${Number(value || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  doc.setFontSize(10);
+  doc.text(`Total Purchases: ${filtered.length}`, 14, 26);
+  doc.text(`Total Amount: ${formatPDFMoney(filteredTotal)}`, 14, 32);
+  doc.text(`Amount Paid: ${formatPDFMoney(filteredPaid)}`, 14, 38);
+  doc.text(`Outstanding: ${formatPDFMoney(filteredBalance)}`, 14, 44);
+  doc.text(
+    `Generated On: ${new Date().toLocaleDateString("en-IN")}`,
+    14,
+    50
+  );
+
+  const tableColumn = [
+    "Purchase No.",
+    "Date",
+    "Supplier",
+    "Items",
+    "Total",
+    "Paid",
+    "Balance",
+    "Status",
+  ];
+
+  const tableRows = filtered.map((purchase) => {
+    const grandTotal = Number(purchase.grandTotal || 0);
+    const amountPaid = Number(purchase.amountPaid || 0);
+    const balance = Math.max(0, grandTotal - amountPaid);
+
+    return [
+      purchase.purchaseNumber || "-",
+      formatDate(purchase.purchaseDate || purchase.createdAt),
+      purchase.supplierName || "-",
+      `${purchase.items?.length || 0}`,
+      formatPDFMoney(grandTotal),
+      formatPDFMoney(amountPaid),
+      formatPDFMoney(balance),
+      purchase.paymentStatus || "Unpaid",
+    ];
+  });
+
+  autoTable(doc, {
+    head: [tableColumn],
+    body: tableRows,
+    startY: 56,
+    theme: "grid",
+    styles: {
+      fontSize: 8,
+      cellPadding: 2.5,
+      overflow: "linebreak",
+    },
+    headStyles: {
+      fillColor: [59, 107, 157],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+    alternateRowStyles: {
+      fillColor: [245, 248, 252],
+    },
+  });
+
+  doc.save("Purchase_Report.pdf");
+};
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const currentPage = Math.min(page, Math.max(totalPages, 1));
@@ -257,6 +365,25 @@ const filtered = useMemo(() => {
           </div>
 
           <div style={styles.searchBox}>
+
+            <Button
+  onClick={handleDownloadPDF}
+  style={{
+    border: 0,
+    background: "#3b6b9d",
+    borderRadius: 6,
+    padding: "8px 12px",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 11,
+    whiteSpace: "nowrap",
+  }}
+>
+  <BsDownload size={14} />
+  Download PDF
+</Button>
+
             <BsSearch
               size={14}
               style={{ color: "#9aa5b1", flexShrink: 0 }}

@@ -2,6 +2,10 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Button, Card, Table } from "react-bootstrap";
 import axios from "axios";
+
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 import {
   BsPlus,
   BsPencil,
@@ -13,6 +17,7 @@ import {
   BsClock,
   BsCurrencyRupee,
     BsPrinter,
+    BsDownload,
 } from "react-icons/bs";
 import { pdf } from "@react-pdf/renderer";
 import { InvoicePDF } from "./ViewInvoice";
@@ -145,6 +150,101 @@ export const Invoices = () => {
       );
     }
   );
+
+  const handleDownloadPDF = () => {
+  if (filteredInvoices.length === 0) {
+    alert("No invoices available to download.");
+    return;
+  }
+
+  const doc = new jsPDF("landscape");
+
+  doc.setFontSize(18);
+  doc.text("Invoice Report", 14, 18);
+
+  doc.setFontSize(10);
+  doc.text(
+    `Total Invoices: ${filteredInvoices.length}`,
+    14,
+    26
+  );
+
+  doc.text(
+    `Generated On: ${new Date().toLocaleDateString("en-IN")}`,
+    14,
+    32
+  );
+
+  const tableColumn = [
+    "Invoice No.",
+    "Date",
+    "Customer",
+    "Items",
+    "Amount",
+    "Payment",
+    "Status",
+    "Paid Amount",
+    "Balance",
+  ];
+
+  const tableRows = filteredInvoices.map((invoice) => {
+    const paidAmount =
+      invoice.paymentStatus === "Paid"
+        ? Number(invoice.grandTotal || 0)
+        : invoice.paymentStatus === "Unpaid"
+        ? 0
+        : Number(invoice.amountReceived || 0);
+
+    const balanceAmount =
+      invoice.paymentStatus === "Paid"
+        ? 0
+        : Math.max(
+            0,
+            Number(invoice.grandTotal || 0) -
+              Number(invoice.amountReceived || 0)
+          );
+
+    const formatPDFMoney = (amount) =>
+      `Rs. ${Number(amount || 0).toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+
+    return [
+      invoice.invoiceNumber || "-",
+      formatDate(invoice.date || invoice.createdAt),
+      invoice.customerName || "Walk-in Customer",
+      `${invoice.items?.length || 0}`,
+      formatPDFMoney(invoice.grandTotal),
+      invoice.paymentMethod || "-",
+      invoice.paymentStatus || "Unknown",
+      formatPDFMoney(paidAmount),
+      formatPDFMoney(balanceAmount),
+    ];
+  });
+
+  autoTable(doc, {
+    head: [tableColumn],
+    body: tableRows,
+    startY: 38,
+    theme: "grid",
+    styles: {
+      fontSize: 7,
+      cellPadding: 2.5,
+      overflow: "linebreak",
+    },
+    headStyles: {
+      fillColor: [59, 107, 157],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+    alternateRowStyles: {
+      fillColor: [245, 248, 252],
+    },
+  });
+
+  doc.save("Invoice_Report.pdf");
+};
 
   // =========================
   // PAGINATION
@@ -549,6 +649,23 @@ const handlePrintInvoice = async (invoice) => {
           {/* SEARCH */}
 
           <div style={searchArea}>
+
+<Button
+  onClick={handleDownloadPDF}
+  variant="outline-primary"
+  style={{
+    fontSize: "11px",
+    padding: "7px 10px",
+    borderRadius: "6px",
+    display: "flex",
+    alignItems: "center",
+    gap: "5px",
+    whiteSpace: "nowrap",
+  }}
+>
+  <BsDownload size={14} />
+  Download PDF
+</Button>
 
             <div style={searchBox}>
 

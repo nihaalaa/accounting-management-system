@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button, Card, Table, Offcanvas  } from "react-bootstrap";
 import axios from "axios";
+
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
 import {
   BsPlus,
   BsPencil,
@@ -19,6 +23,7 @@ import {
   BsEye,
   BsArrowLeft,
   BsPlusCircle,
+  BsDownload,
 } from "react-icons/bs";
 
 /* =========================================================
@@ -166,6 +171,73 @@ const [savingStock, setSavingStock] = useState(false);
     toDate,
   ]);
 
+  const handleDownloadPDF = () => {
+  if (filteredProducts.length === 0) {
+    alert("No products available to download.");
+    return;
+  }
+
+  const doc = new jsPDF("landscape");
+
+  doc.setFontSize(18);
+  doc.text("Product Inventory", 14, 18);
+
+  doc.setFontSize(10);
+  doc.text(
+    `Total Products: ${filteredProducts.length}`,
+    14,
+    26
+  );
+
+  doc.text(
+    `Generated On: ${new Date().toLocaleDateString("en-IN")}`,
+    14,
+    32
+  );
+
+  const tableColumn = [
+    "Product",
+    "Category",
+    "Purchase Price",
+    "Selling Price",
+    "Stock",
+    "Min. Stock",
+    "Unit",
+    "Status",
+  ];
+
+  const tableRows = filteredProducts.map((product) => [
+    `${product.name || ""}\n${product.code || ""}`,
+    product.category || "Uncategorized",
+`Rs. ${Number(product.purchasePrice || 0).toLocaleString("en-IN")}`,
+`Rs. ${Number(product.sellingPrice || 0).toLocaleString("en-IN")}`,
+    Number(product.currentStock || 0),
+    Number(product.minimumStock || 0),
+    product.unit || "—",
+    getStatus(product),
+  ]);
+
+  autoTable(doc, {
+    head: [tableColumn],
+    body: tableRows,
+    startY: 38,
+    theme: "grid",
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+    },
+    headStyles: {
+      fillColor: [59, 107, 157],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+    alternateRowStyles: {
+      fillColor: [245, 248, 252],
+    },
+  });
+
+  doc.save("Products.pdf");
+};
   /* =======================================================
      PAGINATION
   ======================================================= */
@@ -692,12 +764,36 @@ const handleSaveStockAdjustment = async () => {
             </div>
           </div>
 
-          <div style={styles.recordBadge}>
-            {filteredProducts.length}{" "}
-            {filteredProducts.length === 1
-              ? "record"
-              : "records"}
-          </div>
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  }}
+>
+  <Button
+    onClick={handleDownloadPDF}
+    variant="outline-primary"
+    style={{
+      fontSize: "12px",
+      padding: "7px 12px",
+      borderRadius: "6px",
+      display: "flex",
+      alignItems: "center",
+      gap: "6px",
+    }}
+  >
+    <BsDownload size={14} />
+    Download PDF
+  </Button>
+
+  <div style={styles.recordBadge}>
+    {filteredProducts.length}{" "}
+    {filteredProducts.length === 1
+      ? "record"
+      : "records"}
+  </div>
+</div>
 
         </div>
 
