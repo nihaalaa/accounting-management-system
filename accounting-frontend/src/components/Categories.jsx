@@ -9,6 +9,7 @@ import {
   BsFolder,
   BsSearch,
   BsGrid,
+    BsEye,
 } from "react-icons/bs";
 
 export const Categories = () => {
@@ -374,7 +375,15 @@ export const Categories = () => {
                       >
 
                         <div style={actions}>
-
+<Button
+  size="sm"
+  onClick={() =>
+    navigate(`/categories/view/${category._id}`)
+  }
+  style={viewButton}
+>
+  <BsEye size={13} />
+</Button>
                           <Button
                             size="sm"
                             onClick={() =>
@@ -385,7 +394,6 @@ export const Categories = () => {
                             style={editButton}
                           >
                             <BsPencil size={13} />
-                            Edit
                           </Button>
 
 
@@ -397,7 +405,6 @@ export const Categories = () => {
                             style={deleteButton}
                           >
                             <BsTrash size={13} />
-                            Delete
                           </Button>
 
                         </div>
@@ -969,6 +976,19 @@ const deleteButton = {
   padding: "6px 10px",
 };
 
+const viewButton = {
+  border: "1px solid #dbeafe",
+  backgroundColor: "#f0f7ff",
+  color: "#3b6b9d",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "5px",
+  borderRadius: "6px",
+  fontSize: "11px",
+  fontWeight: "500",
+  padding: "6px 10px",
+};
 
 /* ============================================================
    EMPTY STATE
