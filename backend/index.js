@@ -105,7 +105,8 @@ app.post("/products", async (req, res) => {
       description,
       image,
     } = req.body;
-
+console.log("Received expiry date:", expiryDate);
+console.log("Full request body:", req.body);
     // Get the next permanent product number
     const counter = await Counter.findOneAndUpdate(
       { name: "product" },
@@ -137,6 +138,7 @@ app.post("/products", async (req, res) => {
     });
 
     await product.save();
+    console.log("Product expiry before save:", product.expiryDate);
 
     res.status(201).send("Product added successfully");
 
@@ -276,6 +278,7 @@ app.put("/products/:id", async (req, res) => {
       unit,
       openingStock,
       minimumStock,
+       expiryDate,
       description,
       image,
     } = req.body;
@@ -291,6 +294,7 @@ app.put("/products/:id", async (req, res) => {
         unit,
         openingStock,
         minimumStock,
+              expiryDate,
         description,
         image,
       },

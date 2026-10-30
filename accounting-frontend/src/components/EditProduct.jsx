@@ -741,7 +741,6 @@ export const EditProduct = () => {
                     value={product.tax}
                     onChange={handleChange}
                     style={styles.input}
-                    required
                   >
                     <option value="">
                       Select tax
