@@ -298,7 +298,7 @@ app.put("/products/:id", async (req, res) => {
         description,
         image,
       },
-      { new: true }
+      { new: true ,  runValidators: true}
     );
 
     if (!updateProduct) {
