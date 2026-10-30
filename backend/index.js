@@ -101,6 +101,7 @@ app.post("/products", async (req, res) => {
       unit,
       openingStock,
       minimumStock,
+      expiryDate,
       description,
       image,
     } = req.body;
@@ -130,6 +131,7 @@ app.post("/products", async (req, res) => {
       openingStock,
         currentStock: openingStock,
       minimumStock,
+      expiryDate,
       description,
       image,
     });

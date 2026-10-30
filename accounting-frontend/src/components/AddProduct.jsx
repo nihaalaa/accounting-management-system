@@ -643,10 +643,10 @@ const fetchGstRates = async (hsnCode) => {
 <div>
   <Form.Label>Tax</Form.Label>
 
-  <Form.Select
-    name="tax"
-    value={product.tax}
-    onChange={handleChange}
+<Form.Select
+  name="tax"
+  value={product.tax ?? ""}
+  onChange={handleChange}
     style={styles.input}
     
     disabled={gstRateLoading || gstRateError}
