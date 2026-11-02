@@ -628,11 +628,17 @@ console.log("Invoice items:", JSON.stringify(invoiceData.items, null, 2));
         { new: true }
       );
 
-      if (!product) {
-        throw new Error(
-          `Insufficient stock or product not found: ${productId}`
-        );
-      }
+if (!product) {
+  const existingProduct = await Product.findById(productId);
+
+  if (!existingProduct) {
+    throw new Error("Product not found");
+  }
+
+  throw new Error(
+    `${existingProduct.name} has insufficient stock. Available stock: ${existingProduct.currentStock}`
+  );
+}
 
       // Remember each deduction in case invoice saving fails
       deductedStock.push({ productId, quantity });

@@ -30,6 +30,8 @@ import { ViewProduct } from "./components/ViewProduct";
 import { ViewCategory } from "./components/ViewCategory";
 import { ViewExpense } from "./components/ViewExpense";
 import { SalesReturns } from "./components/SalesReturns";
+import AddSalesReturn from "./components/AddSalesReturn";
+import ViewSalesReturn from "./components/ViewSalesReturn";
 
 function App() {
    return (
@@ -74,6 +76,8 @@ function App() {
             <Route path='/purchases/edit/:id' element={<EditPurchase />} />
 
             <Route path='/sales-returns' element={<SalesReturns />} />
+            <Route path='/sales-returns/add' element={<AddSalesReturn />} />
+            <Route path='/sales-returns/view/:id' element={<ViewSalesReturn />} />
         </Routes>
       </div>
     </div></BrowserRouter>

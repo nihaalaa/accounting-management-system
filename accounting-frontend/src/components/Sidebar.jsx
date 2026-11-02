@@ -13,6 +13,7 @@ import {
   BsGear,
   BsBoxArrowRight,
   BsReceipt,
+    BsArrowReturnLeft,
 } from "react-icons/bs";
 
 export const Sidebar = () => {
@@ -23,6 +24,7 @@ export const Sidebar = () => {
     // { name: "Sales", path: "/sales", icon: <BsCartCheck /> },
     { name: "Customers", path: "/customers", icon: <BsPeople /> },
     { name: "Invoices", path: "/invoices", icon: <BsReceipt /> },
+    { name: "Sales Returns", path: "/sales-returns", icon: <BsArrowReturnLeft /> },
     { name: "Expenses", path: "/expenses", icon: <BsCashStack /> },
     { name: "Purchases", path: "/purchases", icon: <BsBagCheck /> },
     { name: "Suppliers", path: "/suppliers", icon: <BsTruck /> },

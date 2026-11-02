@@ -36,6 +36,8 @@ const [amountReceivedInput, setAmountReceivedInput] = useState("");
   const [selectedProduct, setSelectedProduct] = useState("");
   const [quantity, setQuantity] = useState(1);
 
+  const [stockWarning, setStockWarning] = useState("");
+
 const [productSearch, setProductSearch] = useState("");
 const [showProductOptions, setShowProductOptions] = useState(false);
 
@@ -106,7 +108,6 @@ const filteredProducts = products.filter((product) =>
   /* =====================================================
      ADD PRODUCT
   ===================================================== */
-
 const addProduct = (productId, productQuantity) => {
   const product = products.find(
     (p) => p._id === productId
@@ -117,6 +118,26 @@ const addProduct = (productId, productQuantity) => {
   if (!product || !Number.isInteger(qty) || qty < 1) {
     return;
   }
+
+  // Check available stock
+  const availableStock = Number(product.currentStock || 0);
+
+  if (availableStock <= 0) {
+    setStockWarning(
+      `${product.name} is out of stock. You cannot add it to the invoice.`
+    );
+    return;
+  }
+
+  if (qty > availableStock) {
+    setStockWarning(
+      `Only ${availableStock} units of ${product.name} are available.`
+    );
+    return;
+  }
+
+  // Clear warning when quantity is valid
+  setStockWarning("");
 
   const price = Number(product.sellingPrice);
   const tax = Number(product.tax || 0);
@@ -221,6 +242,12 @@ const balanceDue = Math.max(
 // if (!customerId) {
 //   return;
 // }
+
+    if (stockWarning) {
+  alert(stockWarning);
+  return;
+}
+
     if (items.length === 0) {
       alert("Please add at least one product");
       return;
@@ -675,16 +702,31 @@ const invoiceData = {
                 {product.name}
               </div>
 
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: "#64748b",
-                  marginTop: "3px",
-                }}
-              >
-                Selling price: ₹
-                {Number(product.sellingPrice).toFixed(2)}
-              </div>
+<div
+  style={{
+    fontSize: "12px",
+    color: "#64748b",
+    marginTop: "3px",
+  }}
+>
+  Selling price: ₹
+  {Number(product.sellingPrice).toFixed(2)}
+  {" • "}
+  Stock: {Number(product.currentStock || 0)}
+</div>
+
+{Number(product.currentStock || 0) <= 0 && (
+  <div
+    style={{
+      fontSize: "11px",
+      color: "#dc3545",
+      fontWeight: "600",
+      marginTop: "3px",
+    }}
+  >
+    Out of Stock
+  </div>
+)}
             </div>
           ))
         ) : (
@@ -806,6 +848,24 @@ onBlur={() => {
   +
 </button>
   </div>
+
+  {stockWarning && (
+  <div
+    style={{
+      marginTop: "8px",
+      padding: "10px 12px",
+      border: "1px solid #f1c6ca",
+      borderRadius: "6px",
+      backgroundColor: "#fff5f5",
+      color: "#c0392b",
+      fontSize: "12px",
+      fontWeight: "500",
+    }}
+  >
+    ⚠ {stockWarning}
+  </div>
+)}
+
 </Form.Group>
                  </div>
 
