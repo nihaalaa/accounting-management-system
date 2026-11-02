@@ -12,7 +12,7 @@ import {
   BsCheckCircle,
   BsDownload,
     BsPencil,
-  BsXCircle,
+  BsTrash,
 } from "react-icons/bs";
 
 import jsPDF from "jspdf";
@@ -467,7 +467,7 @@ const creditRefunds = completedReturns.reduce(
           style={cancelButtonStyle}
           title="Cancel Sales Return"
         >
-          <BsXCircle size={13} />
+          <BsTrash size={13} />
         </Button>
       </>
     )}

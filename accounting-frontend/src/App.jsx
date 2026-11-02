@@ -32,6 +32,7 @@ import { ViewExpense } from "./components/ViewExpense";
 import { SalesReturns } from "./components/SalesReturns";
 import AddSalesReturn from "./components/AddSalesReturn";
 import ViewSalesReturn from "./components/ViewSalesReturn";
+import EditSalesReturn from "./components/EditSalesReturn";
 
 function App() {
    return (
@@ -78,6 +79,7 @@ function App() {
             <Route path='/sales-returns' element={<SalesReturns />} />
             <Route path='/sales-returns/add' element={<AddSalesReturn />} />
             <Route path='/sales-returns/view/:id' element={<ViewSalesReturn />} />
+            <Route path="/sales-returns/edit/:id" element={<EditSalesReturn />} />
         </Routes>
       </div>
     </div></BrowserRouter>
