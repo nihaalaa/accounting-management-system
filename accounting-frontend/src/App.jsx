@@ -29,6 +29,7 @@ import EditPurchase from "./components/EditPurchase";
 import { ViewProduct } from "./components/ViewProduct";
 import { ViewCategory } from "./components/ViewCategory";
 import { ViewExpense } from "./components/ViewExpense";
+import { SalesReturns } from "./components/SalesReturns";
 
 function App() {
    return (
@@ -72,6 +73,7 @@ function App() {
             <Route path= '/purchases/view/:id' element={<ViewPurchase />} />
             <Route path='/purchases/edit/:id' element={<EditPurchase />} />
 
+            <Route path='/sales-returns' element={<SalesReturns />} />
         </Routes>
       </div>
     </div></BrowserRouter>

@@ -26,14 +26,23 @@ customerType: {
   ],
   default: "Regular Customer",
 },
+
+
+creditBalance: {
+  type: Number,
+  default: 0,
+  min: 0,
+},
+
+
     address: {
       type: String,
     },
 
-    // outstandingBalance: {
-    //   type: Number,
-    //   default: 0,
-    // },
+    outstandingBalance: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

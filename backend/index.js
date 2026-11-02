@@ -23,6 +23,7 @@ const Invoice = require("./models/Invoice");
 const Counter = require("./models/Counter");
 const Supplier = require("./models/Supplier");
 const Purchase = require("./models/Purchase");
+const SalesReturn = require("./models/SalesReturn");
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("mongodb connected"))
@@ -759,7 +760,474 @@ app.delete("/invoices/:id", async (req, res) => {
   }
 });
 
+//SALES RETURN
 
+// GET RETURNABLE ITEMS FROM AN INVOICE
+app.get("/invoices/:id/returnable-items", async (req, res) => {
+  try {
+    // Find original invoice
+    const invoice = await Invoice.findById(req.params.id);
+
+    if (!invoice) {
+      return res.status(404).json({
+        message: "Invoice not found",
+      });
+    }
+
+    // Find completed returns for this invoice
+    const previousReturns = await SalesReturn.find({
+      invoiceId: invoice._id,
+      status: "Completed",
+    });
+
+    // Calculate previously returned quantity for each product
+    const returnedQuantities = {};
+
+    previousReturns.forEach((salesReturn) => {
+      salesReturn.items.forEach((item) => {
+        const productId = item.productId.toString();
+
+        returnedQuantities[productId] =
+          (returnedQuantities[productId] || 0) +
+          item.returnQuantity;
+      });
+    });
+
+    // Calculate remaining returnable quantity
+    const returnableItems = invoice.items.map((item) => {
+      const productId = item.productId.toString();
+
+      const previouslyReturned =
+        returnedQuantities[productId] || 0;
+
+      const remainingQuantity =
+        item.quantity - previouslyReturned;
+
+      return {
+        productId: item.productId,
+        productName: item.productName,
+        quantitySold: item.quantity,
+        previouslyReturned,
+        remainingQuantity: Math.max(0, remainingQuantity),
+        price: item.price,
+        tax: item.tax || 0,
+      };
+    });
+
+    res.status(200).json({
+      invoiceId: invoice._id,
+      invoiceNumber: invoice.invoiceNumber,
+      customerId: invoice.customerId || null,
+      customerName: invoice.customerName || "Walk-in Customer",
+      items: returnableItems,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch returnable items",
+      error: error.message,
+    });
+  }
+});
+
+// GET NEXT SALES RETURN NUMBER
+app.get("/sales-returns/next-number", async (req, res) => {
+  try {
+    const counter = await Counter.findOne({ name: "salesReturn" });
+
+    const nextValue = (counter?.value || 0) + 1;
+
+    const returnNumber = `SR-${String(nextValue).padStart(2, "0")}`;
+
+    res.status(200).json({ returnNumber });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to generate sales return number",
+      error: error.message,
+    });
+  }
+});
+
+// CREATE SALES RETURN
+app.post("/sales-returns", async (req, res) => {
+  const stockUpdates = [];
+  let customerCreditUpdated = false;
+  let invoiceUpdated = false;
+  let savedReturn = null;
+  let originalBalanceDue = 0;
+  let originalPaymentStatus = "";
+
+  try {
+    const {
+      invoiceId,
+      items,
+      refundMethod,
+      notes,
+    } = req.body;
+
+    // Validate basic information
+    if (!invoiceId || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        message: "Invoice and returned products are required",
+      });
+    }
+
+    if (!["Cash", "Customer Credit"].includes(refundMethod)) {
+      return res.status(400).json({
+        message: "Invalid refund method",
+      });
+    }
+
+    // Find original invoice
+    const invoice = await Invoice.findById(invoiceId);
+
+    if (!invoice) {
+      return res.status(404).json({
+        message: "Invoice not found",
+      });
+    }
+
+    if (
+      refundMethod === "Customer Credit" &&
+      !invoice.customerId
+    ) {
+      return res.status(400).json({
+        message: "Customer Credit is only available for registered customers",
+      });
+    }
+
+    // Get previous completed returns
+    const previousReturns = await SalesReturn.find({
+      invoiceId: invoice._id,
+      status: "Completed",
+    });
+
+    const returnedQuantities = {};
+    const previousDiscounts = {};
+
+    previousReturns.forEach((salesReturn) => {
+      salesReturn.items.forEach((item) => {
+        const id = item.productId.toString();
+
+        returnedQuantities[id] =
+          (returnedQuantities[id] || 0) + item.returnQuantity;
+
+        previousDiscounts[id] =
+          (previousDiscounts[id] || 0) +
+          (item.discountAmount || 0);
+      });
+    });
+
+    // Calculate original invoice gross amount before discount
+    const invoiceGross = invoice.items.reduce((sum, item) => {
+      const base = item.quantity * item.price;
+      const tax = base * ((item.tax || 0) / 100);
+
+      return sum + base + tax;
+    }, 0);
+
+    const invoiceDiscount = Math.min(
+      Number(invoice.discount || 0),
+      invoiceGross
+    );
+
+    if (invoiceGross <= 0) {
+      return res.status(400).json({
+        message: "Invalid invoice amount",
+      });
+    }
+
+    const processedItems = [];
+    const submittedProducts = new Set();
+
+    let subtotal = 0;
+    let totalTax = 0;
+    let totalRefund = 0;
+
+    // Validate and calculate each returned product
+    for (const returnedItem of items) {
+      const productId = String(returnedItem.productId);
+      const returnQuantity = Number(returnedItem.returnQuantity);
+
+      if (submittedProducts.has(productId)) {
+        throw new Error("A product can only appear once in a return");
+      }
+
+      submittedProducts.add(productId);
+
+      if (!Number.isInteger(returnQuantity) || returnQuantity < 1) {
+        throw new Error("Return quantity must be a positive integer");
+      }
+
+      if (
+        !["Good", "Damaged", "Defective"].includes(
+          returnedItem.condition
+        )
+      ) {
+        throw new Error("Invalid product condition");
+      }
+
+      const invoiceItem = invoice.items.find(
+        (item) => item.productId.toString() === productId
+      );
+
+      if (!invoiceItem) {
+        throw new Error("Product does not belong to this invoice");
+      }
+
+      const previouslyReturned = returnedQuantities[productId] || 0;
+
+      const remainingQuantity =
+        invoiceItem.quantity - previouslyReturned;
+
+      if (returnQuantity > remainingQuantity) {
+        throw new Error(
+          `Only ${Math.max(0, remainingQuantity)} units can be returned for ${invoiceItem.productName}`
+        );
+      }
+
+      const baseAmount = returnQuantity * invoiceItem.price;
+
+      const taxAmount =
+        baseAmount * ((invoiceItem.tax || 0) / 100);
+
+      const itemGross = baseAmount + taxAmount;
+
+      // Allocate invoice discount proportionally
+      const originalItemGross =
+        invoiceItem.quantity *
+        invoiceItem.price *
+        (1 + (invoiceItem.tax || 0) / 100);
+
+      const fullItemDiscount =
+        invoiceDiscount * (originalItemGross / invoiceGross);
+
+      const cumulativeQuantity =
+        previouslyReturned + returnQuantity;
+
+      const cumulativeDiscount =
+        fullItemDiscount *
+        (cumulativeQuantity / invoiceItem.quantity);
+
+      const discountAmount = Math.max(
+        0,
+        cumulativeDiscount - (previousDiscounts[productId] || 0)
+      );
+
+      const refundAmount = Math.max(
+        0,
+        itemGross - discountAmount
+      );
+
+      processedItems.push({
+        productId: invoiceItem.productId,
+        productName: invoiceItem.productName,
+        quantitySold: invoiceItem.quantity,
+        previouslyReturned,
+        returnQuantity,
+        price: invoiceItem.price,
+        tax: invoiceItem.tax || 0,
+        total: itemGross,
+        discountAmount,
+        refundAmount,
+        condition: returnedItem.condition,
+        reason: returnedItem.reason,
+      });
+
+      subtotal += baseAmount;
+      totalTax += taxAmount;
+      totalRefund += refundAmount;
+    }
+
+    // Apply return value against outstanding invoice balance first
+    originalBalanceDue = Number(invoice.balanceDue || 0);
+    originalPaymentStatus = invoice.paymentStatus;
+
+    const appliedToBalance = Math.min(
+      originalBalanceDue,
+      totalRefund
+    );
+
+    const remainingRefund = Math.max(
+      0,
+      totalRefund - appliedToBalance
+    );
+
+    const cashRefund =
+      refundMethod === "Cash" ? remainingRefund : 0;
+
+    const creditRefund =
+      refundMethod === "Customer Credit" ? remainingRefund : 0;
+
+    // Generate actual return number
+    const counter = await Counter.findOneAndUpdate(
+      { name: "salesReturn" },
+      { $inc: { value: 1 } },
+      { new: true, upsert: true }
+    );
+
+    const returnNumber =
+      `SR-${String(counter.value).padStart(2, "0")}`;
+
+    // Create return record
+    const salesReturn = new SalesReturn({
+      returnNumber,
+      invoiceId: invoice._id,
+      invoiceNumber: invoice.invoiceNumber,
+      customerId: invoice.customerId || null,
+      customerName: invoice.customerName || "Walk-in Customer",
+      returnDate: new Date(),
+      items: processedItems,
+      subtotal,
+      totalTax,
+      totalRefund,
+      appliedToBalance,
+      cashRefund,
+      creditRefund,
+      refundMethod,
+      notes: notes || "",
+      status: "Completed",
+    });
+
+    savedReturn = await salesReturn.save();
+
+    // Increase stock only for Good-condition products
+    for (const item of processedItems) {
+      if (item.condition === "Good") {
+        await Product.updateOne(
+          { _id: item.productId },
+          { $inc: { currentStock: item.returnQuantity } }
+        );
+
+        stockUpdates.push({
+          productId: item.productId,
+          quantity: item.returnQuantity,
+        });
+      }
+    }
+
+    // Add excess refund to registered customer's credit
+    if (creditRefund > 0) {
+      await Customer.updateOne(
+        { _id: invoice.customerId },
+        { $inc: { creditBalance: creditRefund } }
+      );
+
+      customerCreditUpdated = true;
+    }
+
+    // Update invoice outstanding balance
+    const newBalanceDue = Math.max(
+      0,
+      originalBalanceDue - appliedToBalance
+    );
+
+    let newPaymentStatus = "Unpaid";
+
+    if (newBalanceDue === 0) {
+      newPaymentStatus = "Paid";
+    } else if (Number(invoice.amountReceived || 0) > 0) {
+      newPaymentStatus = "Partially Paid";
+    }
+
+    await Invoice.updateOne(
+      { _id: invoice._id },
+      {
+        $set: {
+          balanceDue: newBalanceDue,
+          paymentStatus: newPaymentStatus,
+        },
+      }
+    );
+
+    invoiceUpdated = true;
+
+    return res.status(201).json({
+      message: "Sales return created successfully",
+      salesReturn: savedReturn,
+    });
+
+  } catch (error) {
+    console.error("Sales return error:", error);
+
+    // Roll back stock changes if something fails
+    for (const item of stockUpdates) {
+      await Product.updateOne(
+        { _id: item.productId },
+        { $inc: { currentStock: -item.quantity } }
+      );
+    }
+
+    // Roll back customer credit
+    if (customerCreditUpdated && savedReturn) {
+      await Customer.updateOne(
+        { _id: savedReturn.customerId },
+        { $inc: { creditBalance: -savedReturn.creditRefund } }
+      );
+    }
+
+    // Roll back invoice balance
+    if (invoiceUpdated && savedReturn) {
+      await Invoice.updateOne(
+        { _id: savedReturn.invoiceId },
+        {
+          $set: {
+            balanceDue: originalBalanceDue,
+            paymentStatus: originalPaymentStatus,
+          },
+        }
+      );
+    }
+
+    // Remove incomplete return record
+    if (savedReturn) {
+      await SalesReturn.deleteOne({ _id: savedReturn._id });
+    }
+
+    return res.status(400).json({
+      message: "Failed to create sales return",
+      error: error.message,
+    });
+  }
+});
+
+// GET ALL SALES RETURNS
+app.get("/sales-returns", async (req, res) => {
+  try {
+    const salesReturns = await SalesReturn.find()
+      .populate("customerId", "name phone")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(salesReturns);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch sales returns",
+      error: error.message,
+    });
+  }
+});
+
+// GET SALES RETURN BY ID
+app.get("/sales-returns/:id", async (req, res) => {
+  try {
+    const salesReturn = await SalesReturn.findById(req.params.id)
+      .populate("customerId", "name phone")
+      .populate("items.productId", "name code");
+
+    if (!salesReturn) {
+      return res.status(404).json({
+        message: "Sales return not found",
+      });
+    }
+
+    res.status(200).json(salesReturn);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch sales return",
+      error: error.message,
+    });
+  }
+});
 /* =========================
    SUPPLIER ROUTES
 ========================= */
