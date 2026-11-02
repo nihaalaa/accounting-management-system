@@ -11,6 +11,8 @@ import {
   BsCurrencyRupee,
   BsCheckCircle,
   BsDownload,
+    BsPencil,
+  BsXCircle,
 } from "react-icons/bs";
 
 import jsPDF from "jspdf";
@@ -71,6 +73,40 @@ export const SalesReturns = () => {
     navigate(`/sales-returns/view/${id}`);
   };
 
+  // EDIT
+const handleEdit = (id) => {
+  navigate(`/sales-returns/edit/${id}`);
+};
+
+// CANCEL
+const handleCancel = async (id, returnNumber) => {
+  const confirmCancel = window.confirm(
+    `Are you sure you want to cancel sales return ${returnNumber}?\n\nThis will reverse its stock, customer credit and invoice balance changes.`
+  );
+
+  if (!confirmCancel) return;
+
+  try {
+    const response = await axios.patch(
+      `${import.meta.env.VITE_API_URL}/sales-returns/${id}/cancel`
+    );
+
+    alert(
+      response.data.message || "Sales return cancelled successfully"
+    );
+
+    await fetchSalesReturns();
+  } catch (error) {
+    console.error("Error cancelling sales return:", error);
+
+    alert(
+      error.response?.data?.error ||
+      error.response?.data?.message ||
+      "Could not cancel sales return."
+    );
+  }
+};
+
   // DATE
   const formatDate = (date) => {
     if (!date) return "-";
@@ -91,20 +127,24 @@ export const SalesReturns = () => {
   };
 
   // SUMMARY
-  const totalRefund = salesReturns.reduce(
-    (total, item) => total + Number(item.totalRefund || 0),
-    0
-  );
+const completedReturns = salesReturns.filter(
+  (item) => item.status === "Completed"
+);
 
-  const cashRefunds = salesReturns.reduce(
-    (total, item) => total + Number(item.cashRefund || 0),
-    0
-  );
+const totalRefund = completedReturns.reduce(
+  (total, item) => total + Number(item.totalRefund || 0),
+  0
+);
 
-  const creditRefunds = salesReturns.reduce(
-    (total, item) => total + Number(item.creditRefund || 0),
-    0
-  );
+const cashRefunds = completedReturns.reduce(
+  (total, item) => total + Number(item.cashRefund || 0),
+  0
+);
+
+const creditRefunds = completedReturns.reduce(
+  (total, item) => total + Number(item.creditRefund || 0),
+  0
+);
 
   // DOWNLOAD PDF
   const handleDownloadPDF = () => {
@@ -209,7 +249,7 @@ export const SalesReturns = () => {
           </div>
           <div>
             <div style={summaryLabel}>Total Returns</div>
-            <div style={summaryNumber}>{salesReturns.length}</div>
+            <div style={summaryNumber}>{completedReturns.length}</div>
             <div style={summaryHint}>All recorded returns</div>
           </div>
         </div>
@@ -380,30 +420,59 @@ export const SalesReturns = () => {
                       </span>
                     </td>
 
-                    <td style={tdStyle}>
-                      <span style={{
-                        ...statusStyle,
-                        ...(item.status === "Completed"
-                          ? paidStyle
-                          : partialStyle),
-                      }}>
-                        {item.status || "Unknown"}
-                      </span>
-                    </td>
+<td style={tdStyle}>
+  <span
+    style={{
+      ...statusStyle,
+      ...(item.status === "Completed"
+        ? paidStyle
+        : cancelledStyle),
+    }}
+  >
+    {item.status || "Unknown"}
+  </span>
+</td>
+<td style={tdStyle}>
+  <div style={actionContainer}>
+    {/* VIEW */}
+    <Button
+      variant="light"
+      size="sm"
+      onClick={() => handleView(item._id)}
+      style={viewButtonStyle}
+      title="View Sales Return"
+    >
+      <BsEye size={13} />
+    </Button>
 
-                    <td style={tdStyle}>
-                      <div style={actionContainer}>
-                        <Button
-                          variant="light"
-                          size="sm"
-                          onClick={() => handleView(item._id)}
-                          style={viewButtonStyle}
-                          title="View Sales Return"
-                        >
-                          <BsEye size={13} />
-                        </Button>
-                      </div>
-                    </td>
+    {/* EDIT AND CANCEL: completed returns only */}
+    {item.status === "Completed" && (
+      <>
+        <Button
+          variant="light"
+          size="sm"
+          onClick={() => handleEdit(item._id)}
+          style={editButtonStyle}
+          title="Edit Sales Return"
+        >
+          <BsPencil size={13} />
+        </Button>
+
+        <Button
+          variant="light"
+          size="sm"
+          onClick={() =>
+            handleCancel(item._id, item.returnNumber)
+          }
+          style={cancelButtonStyle}
+          title="Cancel Sales Return"
+        >
+          <BsXCircle size={13} />
+        </Button>
+      </>
+    )}
+  </div>
+</td>
                   </tr>
                 ))
               ) : (
@@ -811,11 +880,6 @@ const paidStyle = {
   color: "#047857",
 };
 
-const partialStyle = {
-  backgroundColor: "#edf3f7",
-  color: "#4b6985",
-};
-
 const actionContainer = {
   display: "flex",
   justifyContent: "center",
@@ -834,6 +898,37 @@ const viewButtonStyle = {
   alignItems: "center",
   justifyContent: "center",
   borderRadius: "5px",
+};
+
+const editButtonStyle = {
+  width: "30px",
+  height: "30px",
+  padding: 0,
+  border: "1px solid #d9e0e6",
+  backgroundColor: "#ffffff",
+  color: "#d97706",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "5px",
+};
+
+const cancelButtonStyle = {
+  width: "30px",
+  height: "30px",
+  padding: 0,
+  border: "1px solid #f3d5d5",
+  backgroundColor: "#ffffff",
+  color: "#dc5555",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "5px",
+};
+
+const cancelledStyle = {
+  backgroundColor: "#fef2f2",
+  color: "#dc2626",
 };
 
 const emptyStyle = {

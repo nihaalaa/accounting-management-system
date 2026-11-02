@@ -23,7 +23,7 @@ export const Sidebar = () => {
     { name: "Categories", path: "/categories", icon: <BsTags /> },
     // { name: "Sales", path: "/sales", icon: <BsCartCheck /> },
     { name: "Customers", path: "/customers", icon: <BsPeople /> },
-    { name: "Invoices", path: "/invoices", icon: <BsReceipt /> },
+    { name: "Sales", path: "/invoices", icon: <BsReceipt /> },
     { name: "Sales Returns", path: "/sales-returns", icon: <BsArrowReturnLeft /> },
     { name: "Expenses", path: "/expenses", icon: <BsCashStack /> },
     { name: "Purchases", path: "/purchases", icon: <BsBagCheck /> },
