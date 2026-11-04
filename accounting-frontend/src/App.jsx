@@ -35,6 +35,8 @@ import ViewSalesReturn from "./components/ViewSalesReturn";
 import EditSalesReturn from "./components/EditSalesReturn";
 import PurchaseReturns from "./components/PurchaseReturns";
 import AddPurchaseReturn from "./components/AddPurchaseReturn";
+import EditPurchaseReturn from "./components/EditPurchaseReturn";
+import ViewPurchaseReturn from "./components/ViewPurchaseReturn";
 
 function App() {
    return (
@@ -85,6 +87,8 @@ function App() {
 
             <Route path="/purchase-returns" element={<PurchaseReturns />} />
             <Route path="/purchase-returns/add" element={<AddPurchaseReturn />} />
+            <Route path="/purchase-returns/view/:id" element={<ViewPurchaseReturn />} />
+            <Route path="/purchase-returns/edit/:id" element={<EditPurchaseReturn />} />
         </Routes>
       </div>
     </div></BrowserRouter>

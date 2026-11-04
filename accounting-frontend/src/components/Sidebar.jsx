@@ -27,6 +27,7 @@ export const Sidebar = () => {
     { name: "Sales Returns", path: "/sales-returns", icon: <BsArrowReturnLeft /> },
     { name: "Expenses", path: "/expenses", icon: <BsCashStack /> },
     { name: "Purchases", path: "/purchases", icon: <BsBagCheck /> },
+    { name: "Purchase Returns", path: "/purchase-returns", icon: <BsArrowReturnLeft /> },
     { name: "Suppliers", path: "/suppliers", icon: <BsTruck /> },
     // { name: "Reports", path: "/reports", icon: <BsBarChart /> },
   ];
