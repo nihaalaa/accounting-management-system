@@ -267,8 +267,8 @@ export default function AddPurchaseReturn() {
         },
       });
     } catch (err) {
-console.error("Create purchase return error:", err);
-console.log("Backend error message:", err.response?.data);
+      console.error("Create purchase return error:", err);
+
       setError(
         err.response?.data?.error ||
           err.response?.data?.message ||
