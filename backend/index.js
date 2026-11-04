@@ -24,6 +24,7 @@ const Counter = require("./models/Counter");
 const Supplier = require("./models/Supplier");
 const Purchase = require("./models/Purchase");
 const SalesReturn = require("./models/SalesReturn");
+const PurchaseReturn = require("./models/PurchaseReturn");
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("mongodb connected"))
@@ -2834,6 +2835,797 @@ app.delete("/purchases/:id", async (req, res) => {
     });
   }
 });
+
+
+app.post("/purchase-returns", async (req, res) => {
+  let stockDeltas = new Map();
+  let stockUpdated = false;
+  let purchase = null;
+  let purchaseReturn = null;
+  let purchaseSaved = false;
+
+  const previousReturnedQuantities = new Map();
+
+  try {
+    const {
+      purchaseId,
+      returnDate,
+      items,
+      refundMethod = "Credit Note",
+      refundAmount = 0,
+      notes = "",
+    } = req.body;
+
+    // 1. Validate purchase ID
+    if (
+      !purchaseId ||
+      !mongoose.Types.ObjectId.isValid(purchaseId)
+    ) {
+      throw new Error("Please select a valid purchase.");
+    }
+
+    // 2. Find original purchase
+    purchase = await Purchase.findById(purchaseId);
+
+    if (!purchase) {
+      return res.status(404).json({
+        message: "Purchase not found.",
+      });
+    }
+
+    // 3. Validate return items
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error("Add at least one product to return.");
+    }
+
+    const preparedItems = [];
+    const returnedByPurchaseItem = new Map();
+
+    // 4. Validate each returned product
+    for (const item of items) {
+      const purchaseItem = purchase.items.find(
+        (p) => String(p._id) === String(item.purchaseItemId)
+      );
+
+      if (!purchaseItem) {
+        throw new Error(
+          "Selected product does not belong to this purchase."
+        );
+      }
+
+      const quantity = Number(item.quantity);
+
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        throw new Error(
+          `Invalid return quantity for ${purchaseItem.productName}.`
+        );
+      }
+
+      const itemId = String(purchaseItem._id);
+
+      const alreadyRequested =
+        returnedByPurchaseItem.get(itemId) || 0;
+
+      const alreadyReturned = Number(
+        purchaseItem.returnedQuantity || 0
+      );
+
+      const availableQuantity =
+        purchaseItem.quantity -
+        alreadyReturned -
+        alreadyRequested;
+
+      if (quantity > availableQuantity) {
+        throw new Error(
+          `Only ${availableQuantity} units of ${purchaseItem.productName} can be returned.`
+        );
+      }
+
+      returnedByPurchaseItem.set(
+        itemId,
+        alreadyRequested + quantity
+      );
+
+      const total = Number(
+        (quantity * purchaseItem.purchasePrice).toFixed(2)
+      );
+
+      preparedItems.push({
+        purchaseItemId: itemId,
+        productId: purchaseItem.productId,
+        productName: purchaseItem.productName,
+        productCode: purchaseItem.productCode,
+        quantity,
+        purchasePrice: purchaseItem.purchasePrice,
+        total,
+        reason: String(item.reason || "").trim(),
+      });
+    }
+
+    // 5. Calculate return total
+    const grandTotal = Number(
+      preparedItems
+        .reduce((sum, item) => sum + item.total, 0)
+        .toFixed(2)
+    );
+
+    const paidRefund = Number(refundAmount);
+
+    if (
+      !Number.isFinite(paidRefund) ||
+      paidRefund < 0 ||
+      paidRefund > grandTotal
+    ) {
+      throw new Error(
+        "Refund amount must be between zero and the return total."
+      );
+    }
+
+    // 6. Validate refund method
+    const allowedRefundMethods = [
+      "Cash",
+      "Bank Transfer",
+      "UPI",
+      "Card",
+      "Cheque",
+      "Credit Note",
+    ];
+
+    if (!allowedRefundMethods.includes(refundMethod)) {
+      throw new Error("Invalid refund method.");
+    }
+
+    // 7. Validate return date
+    const parsedReturnDate = returnDate
+      ? new Date(returnDate)
+      : new Date();
+
+    if (Number.isNaN(parsedReturnDate.getTime())) {
+      throw new Error("Invalid return date.");
+    }
+
+    // 8. Generate return number
+    const counter = await Counter.findOneAndUpdate(
+      { name: "purchaseReturn" },
+      {
+        $inc: { value: 1 },
+        $setOnInsert: { name: "purchaseReturn" },
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true,
+      }
+    );
+
+    const returnNumber =
+      `PRN-${String(counter.value).padStart(4, "0")}`;
+
+    // 9. Calculate stock reduction
+    const stockItems = preparedItems.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    }));
+
+    stockDeltas = getStockDeltas([], stockItems);
+
+    await applyPurchaseStockChanges(stockDeltas);
+    stockUpdated = true;
+
+    // 10. Store previous returned quantities
+    for (const [itemId, quantity] of returnedByPurchaseItem) {
+      const purchaseItem = purchase.items.find(
+        (p) => String(p._id) === itemId
+      );
+
+      previousReturnedQuantities.set(
+        itemId,
+        Number(purchaseItem.returnedQuantity || 0)
+      );
+
+      purchaseItem.returnedQuantity =
+        Number(purchaseItem.returnedQuantity || 0) +
+        quantity;
+    }
+
+    // 11. Update original purchase
+    await purchase.save();
+    purchaseSaved = true;
+
+    // 12. Create Purchase Return record
+    purchaseReturn = await PurchaseReturn.create({
+      returnNumber,
+      purchaseId: purchase._id,
+      purchaseNumber: purchase.purchaseNumber,
+      supplierId: purchase.supplierId,
+      supplierName: purchase.supplierName,
+      returnDate: parsedReturnDate,
+      items: preparedItems,
+      grandTotal,
+      refundMethod,
+      refundAmount: paidRefund,
+      notes: String(notes || "").trim(),
+    });
+
+    return res.status(201).json({
+      message: "Purchase return created successfully.",
+      purchaseReturn,
+    });
+
+  } catch (error) {
+    console.error("Create purchase return error:", error);
+
+    // 13. Remove return record if one was created
+    if (purchaseReturn) {
+      try {
+        await PurchaseReturn.deleteOne({
+          _id: purchaseReturn._id,
+        });
+      } catch (cleanupError) {
+        console.error("Return cleanup error:", cleanupError);
+      }
+    }
+
+    // 14. Restore purchase returned quantities
+    if (purchaseSaved && purchase) {
+      try {
+        const freshPurchase = await Purchase.findById(
+          purchase._id
+        );
+
+        if (freshPurchase) {
+          for (const [itemId, previousQuantity] of previousReturnedQuantities) {
+            const purchaseItem = freshPurchase.items.find(
+              (p) => String(p._id) === itemId
+            );
+
+            if (purchaseItem) {
+              purchaseItem.returnedQuantity = previousQuantity;
+            }
+          }
+
+          await freshPurchase.save();
+        }
+      } catch (restoreError) {
+        console.error(
+          "Purchase quantity restoration error:",
+          restoreError
+        );
+      }
+    }
+
+    // 15. Restore product stock
+    if (stockUpdated) {
+      try {
+        const reverseDeltas = new Map(
+          [...stockDeltas].map(([id, delta]) => [
+            id,
+            -delta,
+          ])
+        );
+
+        await applyPurchaseStockChanges(reverseDeltas);
+      } catch (rollbackError) {
+        console.error(
+          "Purchase return stock rollback error:",
+          rollbackError
+        );
+      }
+    }
+
+    return res.status(400).json({
+      message: "Failed to create purchase return.",
+      error: error.message,
+    });
+  }
+});
+
+
+app.get("/purchase-returns", async (req, res) => {
+  try {
+    const returns = await PurchaseReturn.find()
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(returns);
+  } catch (error) {
+    console.error("Fetch purchase returns error:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch purchase returns.",
+      error: error.message,
+    });
+  }
+});
+
+
+app.get("/purchase-returns/:id", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: "Invalid purchase return ID.",
+      });
+    }
+
+    const purchaseReturn = await PurchaseReturn.findById(
+      req.params.id
+    );
+
+    if (!purchaseReturn) {
+      return res.status(404).json({
+        message: "Purchase return not found.",
+      });
+    }
+
+    res.status(200).json(purchaseReturn);
+  } catch (error) {
+    console.error("Fetch purchase return error:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch purchase return.",
+      error: error.message,
+    });
+  }
+});
+
+
+app.put("/purchase-returns/:id", async (req, res) => {
+  let purchase = null;
+  let existingReturn = null;
+  let stockDeltas = new Map();
+  let stockUpdated = false;
+  let purchaseSaved = false;
+
+  const previousQuantities = new Map();
+
+  try {
+    const { id } = req.params;
+
+    // 1. Validate return ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid purchase return ID.",
+      });
+    }
+
+    // 2. Find existing return
+    existingReturn = await PurchaseReturn.findById(id);
+
+    if (!existingReturn) {
+      return res.status(404).json({
+        message: "Purchase return not found.",
+      });
+    }
+
+    // 3. Find original purchase
+    purchase = await Purchase.findById(
+      existingReturn.purchaseId
+    );
+
+    if (!purchase) {
+      throw new Error("Original purchase not found.");
+    }
+
+    const { items } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error("Add at least one product to return.");
+    }
+
+    // 4. Calculate quantities from the existing return
+    const oldQuantities = new Map();
+
+    for (const item of existingReturn.items) {
+      const itemId = String(item.purchaseItemId);
+
+      oldQuantities.set(
+        itemId,
+        (oldQuantities.get(itemId) || 0) +
+          Number(item.quantity)
+      );
+    }
+
+    // 5. Prepare updated items
+    const preparedItems = [];
+    const newQuantities = new Map();
+
+    for (const item of items) {
+      const purchaseItem = purchase.items.find(
+        (p) =>
+          String(p._id) === String(item.purchaseItemId)
+      );
+
+      if (!purchaseItem) {
+        throw new Error(
+          "Selected product does not belong to the original purchase."
+        );
+      }
+
+      const quantity = Number(item.quantity);
+
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        throw new Error(
+          `Invalid return quantity for ${purchaseItem.productName}.`
+        );
+      }
+
+      const itemId = String(purchaseItem._id);
+
+      const alreadyRequested =
+        newQuantities.get(itemId) || 0;
+
+      const previouslyReturned =
+        Number(purchaseItem.returnedQuantity || 0);
+
+      const oldReturnQuantity =
+        oldQuantities.get(itemId) || 0;
+
+      const availableQuantity =
+        purchaseItem.quantity -
+        previouslyReturned +
+        oldReturnQuantity -
+        alreadyRequested;
+
+      if (quantity > availableQuantity) {
+        throw new Error(
+          `Only ${availableQuantity} units of ${purchaseItem.productName} can be returned.`
+        );
+      }
+
+      newQuantities.set(
+        itemId,
+        alreadyRequested + quantity
+      );
+
+      preparedItems.push({
+        purchaseItemId: itemId,
+        productId: purchaseItem.productId,
+        productName: purchaseItem.productName,
+        productCode: purchaseItem.productCode,
+        quantity,
+        purchasePrice: purchaseItem.purchasePrice,
+        total: Number(
+          (quantity * purchaseItem.purchasePrice).toFixed(2)
+        ),
+        reason: String(item.reason || "").trim(),
+      });
+    }
+
+    // 6. Calculate new return total
+    const grandTotal = Number(
+      preparedItems
+        .reduce((sum, item) => sum + item.total, 0)
+        .toFixed(2)
+    );
+
+    const refundAmount =
+      req.body.refundAmount === undefined
+        ? Number(existingReturn.refundAmount || 0)
+        : Number(req.body.refundAmount);
+
+    if (
+      !Number.isFinite(refundAmount) ||
+      refundAmount < 0 ||
+      refundAmount > grandTotal
+    ) {
+      throw new Error(
+        "Refund amount must be between zero and the return total."
+      );
+    }
+
+    const refundMethod =
+      req.body.refundMethod || existingReturn.refundMethod;
+
+    const allowedRefundMethods = [
+      "Cash",
+      "Bank Transfer",
+      "UPI",
+      "Card",
+      "Cheque",
+      "Credit Note",
+    ];
+
+    if (!allowedRefundMethods.includes(refundMethod)) {
+      throw new Error("Invalid refund method.");
+    }
+
+    let parsedReturnDate = existingReturn.returnDate;
+
+    if (req.body.returnDate !== undefined) {
+      parsedReturnDate = new Date(req.body.returnDate);
+
+      if (Number.isNaN(parsedReturnDate.getTime())) {
+        throw new Error("Invalid return date.");
+      }
+    }
+
+    // 7. Calculate stock difference
+    const oldStockItems = existingReturn.items.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    }));
+
+    const newStockItems = preparedItems.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    }));
+
+    // Restores stock when return quantity decreases.
+    // Reduces stock when return quantity increases.
+    stockDeltas = getStockDeltas(
+      oldStockItems,
+      newStockItems
+    );
+
+    // 8. Update returned quantities in original purchase
+    const allItemIds = new Set([
+      ...oldQuantities.keys(),
+      ...newQuantities.keys(),
+    ]);
+
+    for (const itemId of allItemIds) {
+      const purchaseItem = purchase.items.find(
+        (p) => String(p._id) === itemId
+      );
+
+      if (!purchaseItem) continue;
+
+      const previous = Number(
+        purchaseItem.returnedQuantity || 0
+      );
+
+      previousQuantities.set(itemId, previous);
+
+      const oldQuantity = oldQuantities.get(itemId) || 0;
+      const newQuantity = newQuantities.get(itemId) || 0;
+
+      purchaseItem.returnedQuantity =
+        previous - oldQuantity + newQuantity;
+    }
+
+    // 9. Save purchase quantity changes
+    await purchase.save();
+    purchaseSaved = true;
+
+    // 10. Apply stock difference
+    await applyPurchaseStockChanges(stockDeltas);
+    stockUpdated = true;
+
+    // 11. Update return document
+    existingReturn.items = preparedItems;
+    existingReturn.grandTotal = grandTotal;
+    existingReturn.refundAmount = refundAmount;
+    existingReturn.refundMethod = refundMethod;
+    existingReturn.returnDate = parsedReturnDate;
+
+    if (req.body.notes !== undefined) {
+      existingReturn.notes = String(req.body.notes).trim();
+    }
+
+    const updatedReturn = await existingReturn.save();
+
+    return res.status(200).json({
+      message: "Purchase return updated successfully.",
+      purchaseReturn: updatedReturn,
+    });
+
+  } catch (error) {
+    console.error("Update purchase return error:", error);
+
+    // 12. Restore stock if necessary
+    if (stockUpdated) {
+      try {
+        const reverseDeltas = new Map(
+          [...stockDeltas].map(([id, delta]) => [
+            id,
+            -delta,
+          ])
+        );
+
+        await applyPurchaseStockChanges(reverseDeltas);
+      } catch (rollbackError) {
+        console.error("Stock rollback error:", rollbackError);
+      }
+    }
+
+    // 13. Restore original purchase quantities
+    if (purchaseSaved && purchase) {
+      try {
+        const freshPurchase = await Purchase.findById(
+          purchase._id
+        );
+
+        if (freshPurchase) {
+          for (const [itemId, quantity] of previousQuantities) {
+            const purchaseItem = freshPurchase.items.find(
+              (p) => String(p._id) === itemId
+            );
+
+            if (purchaseItem) {
+              purchaseItem.returnedQuantity = quantity;
+            }
+          }
+
+          await freshPurchase.save();
+        }
+      } catch (restoreError) {
+        console.error(
+          "Purchase quantity rollback error:",
+          restoreError
+        );
+      }
+    }
+
+    return res.status(400).json({
+      message: "Failed to update purchase return.",
+      error: error.message,
+    });
+  }
+});
+
+
+app.delete("/purchase-returns/:id", async (req, res) => {
+  let purchase = null;
+  let purchaseReturn = null;
+  let purchaseSaved = false;
+  let stockUpdated = false;
+
+  let stockDeltas = new Map();
+  const previousQuantities = new Map();
+
+  try {
+    // 1. Validate return ID
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        message: "Invalid purchase return ID.",
+      });
+    }
+
+    // 2. Find purchase return
+    purchaseReturn = await PurchaseReturn.findById(
+      req.params.id
+    );
+
+    if (!purchaseReturn) {
+      return res.status(404).json({
+        message: "Purchase return not found.",
+      });
+    }
+
+    // 3. Find original purchase
+    purchase = await Purchase.findById(
+      purchaseReturn.purchaseId
+    );
+
+    if (!purchase) {
+      throw new Error("Original purchase not found.");
+    }
+
+    // 4. Prepare returned quantities
+    const returnedQuantities = new Map();
+
+    for (const item of purchaseReturn.items) {
+      const itemId = String(item.purchaseItemId);
+
+      returnedQuantities.set(
+        itemId,
+        (returnedQuantities.get(itemId) || 0) +
+          Number(item.quantity)
+      );
+    }
+
+    // 5. Validate and restore purchase quantities
+    for (const [itemId, quantity] of returnedQuantities) {
+      const purchaseItem = purchase.items.find(
+        (p) => String(p._id) === itemId
+      );
+
+      if (!purchaseItem) {
+        throw new Error(
+          "Original purchase item not found."
+        );
+      }
+
+      const currentReturned = Number(
+        purchaseItem.returnedQuantity || 0
+      );
+
+      if (currentReturned < quantity) {
+        throw new Error(
+          `Return quantity mismatch for ${purchaseItem.productName}.`
+        );
+      }
+
+      previousQuantities.set(itemId, currentReturned);
+
+      purchaseItem.returnedQuantity =
+        currentReturned - quantity;
+    }
+
+    // 6. Save original purchase
+    await purchase.save();
+    purchaseSaved = true;
+
+    // 7. Restore product stock
+    const returnedStockItems = purchaseReturn.items.map(
+      (item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+      })
+    );
+
+    stockDeltas = getStockDeltas(
+      returnedStockItems,
+      []
+    );
+
+    await applyPurchaseStockChanges(stockDeltas);
+    stockUpdated = true;
+
+    // 8. Delete return record
+    await PurchaseReturn.deleteOne({
+      _id: purchaseReturn._id,
+    });
+
+    return res.status(200).json({
+      message:
+        "Purchase return deleted and stock restored successfully.",
+    });
+
+  } catch (error) {
+    console.error("Delete purchase return error:", error);
+
+    // 9. Reverse stock restoration if deletion failed
+    if (stockUpdated) {
+      try {
+        const reverseDeltas = new Map(
+          [...stockDeltas].map(([id, delta]) => [
+            id,
+            -delta,
+          ])
+        );
+
+        await applyPurchaseStockChanges(reverseDeltas);
+      } catch (rollbackError) {
+        console.error("Stock rollback error:", rollbackError);
+      }
+    }
+
+    // 10. Restore previous returned quantities
+    if (purchaseSaved && purchase) {
+      try {
+        const freshPurchase = await Purchase.findById(
+          purchase._id
+        );
+
+        if (freshPurchase) {
+          for (const [itemId, quantity] of previousQuantities) {
+            const purchaseItem = freshPurchase.items.find(
+              (p) => String(p._id) === itemId
+            );
+
+            if (purchaseItem) {
+              purchaseItem.returnedQuantity = quantity;
+            }
+          }
+
+          await freshPurchase.save();
+        }
+      } catch (restoreError) {
+        console.error(
+          "Purchase quantity rollback error:",
+          restoreError
+        );
+      }
+    }
+
+    return res.status(400).json({
+      message: "Failed to delete purchase return.",
+      error: error.message,
+    });
+  }
+});
+
+
 
 const PORT = process.env.PORT || 5000;
 

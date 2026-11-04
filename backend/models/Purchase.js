@@ -26,6 +26,11 @@ const purchaseItemSchema = new mongoose.Schema(
         message: "Quantity must be a whole number.",
       },
     },
+    returnedQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     purchasePrice: {
       type: Number,
       required: true,
@@ -36,8 +41,7 @@ const purchaseItemSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-  },
-  { _id: false }
+  }
 );
 
 const purchaseSchema = new mongoose.Schema(
