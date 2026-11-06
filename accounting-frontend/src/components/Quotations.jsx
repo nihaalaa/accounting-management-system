@@ -14,6 +14,7 @@ import {
   BsTrash,
   BsCheckCircle,
   BsFileEarmarkText,
+  BsArrowLeftRight,
 } from "react-icons/bs";
 
 import jsPDF from "jspdf";
@@ -84,6 +85,44 @@ const Quotations = () => {
   const handleView = (id) => {
     navigate(`/quotations/view/${id}`);
   };
+
+  // CONVERT QUOTATION TO INVOICE
+const handleConvertToInvoice = async (id, quotationNumber) => {
+  const confirmConvert = window.confirm(
+    `Are you sure you want to convert quotation ${quotationNumber} into an invoice?`
+  );
+
+  if (!confirmConvert) return;
+
+  try {
+    const response = await axios.post(
+      `${API_URL}/quotations/${id}/convert`
+    );
+
+    alert(
+      response.data.message ||
+      "Quotation converted successfully!"
+    );
+
+    await fetchQuotations();
+
+    const invoiceId = response.data.invoice?._id;
+
+    if (invoiceId) {
+      navigate(`/invoices/view/${invoiceId}`);
+    } else {
+      navigate("/invoices");
+    }
+  } catch (error) {
+    console.error("Quotation conversion error:", error);
+
+    alert(
+      error.response?.data?.error ||
+      error.response?.data?.message ||
+      "Could not convert quotation into invoice."
+    );
+  }
+};
 
   // EDIT
   const handleEdit = (id) => {
@@ -561,7 +600,23 @@ const Quotations = () => {
                         >
                           <BsEye size={13} />
                         </Button>
-
+{/* CONVERT TO INVOICE */}
+{item.status !== "Converted" && (
+  <Button
+    variant="light"
+    size="sm"
+    onClick={() =>
+      handleConvertToInvoice(
+        item._id,
+        item.quotationNumber
+      )
+    }
+    style={convertButtonStyle}
+    title="Convert to Invoice"
+  >
+    <BsArrowLeftRight size={13} />
+  </Button>
+)}
                         {/* EDIT */}
                         {item.status !== "Converted" && (
                           <Button
@@ -1029,6 +1084,19 @@ const viewButtonStyle = {
   border: "1px solid #d9e0e6",
   backgroundColor: "#ffffff",
   color: "#3b6b9d",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "5px",
+};
+
+const convertButtonStyle = {
+  width: "30px",
+  height: "30px",
+  padding: 0,
+  border: "1px solid #d9e0e6",
+  backgroundColor: "#ffffff",
+  color: "#047857",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",

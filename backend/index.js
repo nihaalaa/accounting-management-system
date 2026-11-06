@@ -707,28 +707,6 @@ app.get("/quotations/next-number", async (req, res) => {
     });
   }
 });
-
-app.get("/quotations/next-number", async (req, res) => {
-  try {
-    const counter = await Counter.findOne({
-      name: "quotation",
-    });
-
-    const nextValue = (counter?.value || 0) + 1;
-
-    const quotationNumber = `QT-${String(nextValue).padStart(3, "0")}`;
-
-    res.status(200).json({
-      quotationNumber,
-    });
-  } catch (error) {
-    console.error("Get next quotation number error:", error);
-
-    res.status(500).json({
-      message: "Failed to generate quotation number",
-    });
-  }
-});
 app.get("/quotations/:id", async (req, res) => {
   try {
     const quotation = await Quotation.findById(req.params.id);
@@ -960,6 +938,149 @@ if (!product) {
   }
 });
 
+app.post("/quotations/:id/convert", async (req, res) => {
+  const deductedStock = [];
+
+  try {
+    const quotation = await Quotation.findById(req.params.id);
+
+    if (!quotation) {
+      return res.status(404).json({
+        message: "Quotation not found",
+      });
+    }
+
+    if (quotation.status === "Converted" || quotation.convertedInvoiceId) {
+      return res.status(400).json({
+        message: "This quotation has already been converted",
+      });
+    }
+
+    if (!quotation.items || quotation.items.length === 0) {
+      return res.status(400).json({
+        message: "Quotation has no products",
+      });
+    }
+
+    // Generate invoice number using the existing frontend format
+    const invoiceCount = await Invoice.countDocuments();
+
+    const invoiceNumber =
+      `INV-${String(invoiceCount + 1).padStart(4, "0")}`;
+
+    // Prepare invoice data from quotation
+    const invoiceData = {
+      invoiceNumber,
+      date: new Date(),
+      customerId: quotation.customerId,
+      customerName: quotation.customerName,
+      customerPhone: quotation.customerPhone,
+      customerAddress: quotation.customerAddress,
+      items: quotation.items.map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        price: item.price,
+        tax: item.tax,
+        total: item.total,
+      })),
+      subtotal: quotation.subtotal,
+      taxAmount: quotation.taxAmount,
+      discount: quotation.discount,
+      grandTotal: quotation.grandTotal,
+
+      // New invoices converted from quotations start unpaid
+      paymentMethod: "Cash",
+      paymentStatus: "Unpaid",
+      amountReceived: 0,
+      balanceDue: quotation.grandTotal,
+      dueDate: null,
+
+      notes: quotation.notes,
+    };
+
+    // Combine quantities for duplicate products
+    const productQuantities = new Map();
+
+    for (const item of invoiceData.items) {
+      const productId = String(item.productId);
+      const quantity = Number(item.quantity);
+
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        throw new Error("Product quantity must be a positive integer");
+      }
+
+      productQuantities.set(
+        productId,
+        (productQuantities.get(productId) || 0) + quantity
+      );
+    }
+
+    // Deduct stock
+    for (const [productId, quantity] of productQuantities) {
+      const product = await Product.findOneAndUpdate(
+        {
+          _id: productId,
+          currentStock: { $gte: quantity },
+        },
+        {
+          $inc: { currentStock: -quantity },
+        },
+        { new: true }
+      );
+
+      if (!product) {
+        const existingProduct = await Product.findById(productId);
+
+        if (!existingProduct) {
+          throw new Error("Product not found");
+        }
+
+        throw new Error(
+          `${existingProduct.name} has insufficient stock. Available stock: ${existingProduct.currentStock}`
+        );
+      }
+
+      deductedStock.push({ productId, quantity });
+    }
+
+    // Save invoice
+    const invoice = new Invoice(invoiceData);
+    const savedInvoice = await invoice.save();
+
+    // Mark quotation as converted
+    quotation.status = "Converted";
+    quotation.convertedInvoiceId = savedInvoice._id;
+
+    await quotation.save();
+
+    return res.status(201).json({
+      message: "Quotation converted into invoice successfully",
+      invoice: savedInvoice,
+      quotation,
+    });
+
+  } catch (error) {
+    console.error("Convert quotation error:", error);
+
+    // Restore stock if conversion fails
+    for (const item of deductedStock) {
+      try {
+        await Product.updateOne(
+          { _id: item.productId },
+          { $inc: { currentStock: item.quantity } }
+        );
+      } catch (rollbackError) {
+        console.error("Stock rollback error:", rollbackError);
+      }
+    }
+
+    return res.status(400).json({
+      message: "Failed to convert quotation",
+      error: error.message,
+    });
+  }
+});
 
 // GET ALL INVOICES
 app.get("/invoices", async (req, res) => {
