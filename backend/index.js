@@ -20,6 +20,7 @@ const Product = require("./models/Product");
 const Expense = require("./models/Expense");
 const Customer = require("./models/Customer")
 const Invoice = require("./models/Invoice");
+const Quotation = require("./models/Quotation");
 const Counter = require("./models/Counter");
 const Supplier = require("./models/Supplier");
 const Purchase = require("./models/Purchase");
@@ -583,6 +584,290 @@ function cleanInvoiceData(data) {
 
   return cleaned;
 }
+
+
+app.post("/quotations", async (req, res) => {
+  try {
+    const {
+      date,
+      validUntil,
+      customerId,
+      customerName,
+      customerPhone,
+      customerAddress,
+      items,
+      subtotal,
+      taxAmount,
+      discount,
+      grandTotal,
+      notes,
+    } = req.body;
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({
+        message: "Quotation must contain at least one product",
+      });
+    }
+
+    // Validate product quantities and product existence
+    for (const item of items) {
+      if (
+        !item.productId ||
+        !Number.isInteger(Number(item.quantity)) ||
+        Number(item.quantity) < 1
+      ) {
+        return res.status(400).json({
+          message: "Invalid product or quantity",
+        });
+      }
+
+      const product = await Product.findById(item.productId);
+
+      if (!product) {
+        return res.status(404).json({
+          message: "Product not found",
+        });
+      }
+    }
+
+    // Generate quotation number
+    const counter = await Counter.findOneAndUpdate(
+      { name: "quotation" },
+      { $inc: { value: 1 } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    const quotationNumber = `QT-${String(counter.value).padStart(3, "0")}`;
+
+    const quotation = new Quotation({
+      quotationNumber,
+      date: date || Date.now(),
+      validUntil: validUntil || null,
+      customerId: customerId || null,
+      customerName: customerName || "Walk-in Customer",
+      customerPhone: customerPhone || "",
+      customerAddress: customerAddress || "",
+      items,
+      subtotal: Number(subtotal) || 0,
+      taxAmount: Number(taxAmount) || 0,
+      discount: Number(discount) || 0,
+      grandTotal: Number(grandTotal) || 0,
+      notes: notes || "",
+      status: "Draft",
+    });
+
+    const savedQuotation = await quotation.save();
+
+    res.status(201).json({
+      message: "Quotation created successfully",
+      quotation: savedQuotation,
+    });
+  } catch (error) {
+    console.error("Create quotation error:", error);
+
+    res.status(500).json({
+      message: "Failed to create quotation",
+      error: error.message,
+    });
+  }
+});
+app.get("/quotations", async (req, res) => {
+  try {
+    const quotations = await Quotation.find()
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(quotations);
+  } catch (error) {
+    console.error("Get quotations error:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch quotations",
+      error: error.message,
+    });
+  }
+});
+app.get("/quotations/next-number", async (req, res) => {
+  try {
+    const counter = await Counter.findOne({
+      name: "quotation",
+    });
+
+    const nextValue = (counter?.value || 0) + 1;
+
+    const quotationNumber = `QT-${String(nextValue).padStart(3, "0")}`;
+
+    res.status(200).json({
+      quotationNumber,
+    });
+  } catch (error) {
+    console.error("Get next quotation number error:", error);
+
+    res.status(500).json({
+      message: "Failed to generate quotation number",
+    });
+  }
+});
+
+app.get("/quotations/next-number", async (req, res) => {
+  try {
+    const counter = await Counter.findOne({
+      name: "quotation",
+    });
+
+    const nextValue = (counter?.value || 0) + 1;
+
+    const quotationNumber = `QT-${String(nextValue).padStart(3, "0")}`;
+
+    res.status(200).json({
+      quotationNumber,
+    });
+  } catch (error) {
+    console.error("Get next quotation number error:", error);
+
+    res.status(500).json({
+      message: "Failed to generate quotation number",
+    });
+  }
+});
+app.get("/quotations/:id", async (req, res) => {
+  try {
+    const quotation = await Quotation.findById(req.params.id);
+
+    if (!quotation) {
+      return res.status(404).json({
+        message: "Quotation not found",
+      });
+    }
+
+    res.status(200).json(quotation);
+  } catch (error) {
+    console.error("Get quotation error:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch quotation",
+      error: error.message,
+    });
+  }
+});
+
+app.put("/quotations/:id", async (req, res) => {
+  try {
+    const {
+      date,
+      validUntil,
+      customerId,
+      customerName,
+      customerPhone,
+      customerAddress,
+      items,
+      subtotal,
+      taxAmount,
+      discount,
+      grandTotal,
+      status,
+      notes,
+    } = req.body;
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({
+        message: "Quotation must contain at least one product",
+      });
+    }
+
+    // Validate products and quantities
+    for (const item of items) {
+      if (
+        !item.productId ||
+        !Number.isInteger(Number(item.quantity)) ||
+        Number(item.quantity) < 1
+      ) {
+        return res.status(400).json({
+          message: "Invalid product or quantity",
+        });
+      }
+
+      const product = await Product.findById(item.productId);
+
+      if (!product) {
+        return res.status(404).json({
+          message: "Product not found",
+        });
+      }
+    }
+
+    const quotation = await Quotation.findById(req.params.id);
+
+    if (!quotation) {
+      return res.status(404).json({
+        message: "Quotation not found",
+      });
+    }
+
+    if (quotation.status === "Converted") {
+      return res.status(400).json({
+        message: "Converted quotations cannot be edited",
+      });
+    }
+
+    quotation.date = date || quotation.date;
+    quotation.validUntil = validUntil || null;
+    quotation.customerId = customerId || null;
+    quotation.customerName = customerName || "Walk-in Customer";
+    quotation.customerPhone = customerPhone || "";
+    quotation.customerAddress = customerAddress || "";
+    quotation.items = items;
+    quotation.subtotal = Number(subtotal) || 0;
+    quotation.taxAmount = Number(taxAmount) || 0;
+    quotation.discount = Number(discount) || 0;
+    quotation.grandTotal = Number(grandTotal) || 0;
+    quotation.status = status || quotation.status;
+    quotation.notes = notes || "";
+
+    const updatedQuotation = await quotation.save();
+
+    res.status(200).json({
+      message: "Quotation updated successfully",
+      quotation: updatedQuotation,
+    });
+  } catch (error) {
+    console.error("Update quotation error:", error);
+
+    res.status(500).json({
+      message: "Failed to update quotation",
+      error: error.message,
+    });
+  }
+});
+app.delete("/quotations/:id", async (req, res) => {
+  try {
+    const quotation = await Quotation.findById(req.params.id);
+
+    if (!quotation) {
+      return res.status(404).json({
+        message: "Quotation not found",
+      });
+    }
+
+    if (quotation.status === "Converted") {
+      return res.status(400).json({
+        message: "Converted quotations cannot be deleted",
+      });
+    }
+
+    await Quotation.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({
+      message: "Quotation deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete quotation error:", error);
+
+    res.status(500).json({
+      message: "Failed to delete quotation",
+      error: error.message,
+    });
+  }
+});
 
 // ADD INVOICE
 

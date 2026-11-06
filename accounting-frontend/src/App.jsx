@@ -37,6 +37,8 @@ import PurchaseReturns from "./components/PurchaseReturns";
 import AddPurchaseReturn from "./components/AddPurchaseReturn";
 import EditPurchaseReturn from "./components/EditPurchaseReturn";
 import ViewPurchaseReturn from "./components/ViewPurchaseReturn";
+import Quotations from "./components/Quotations";
+import AddQuotation from "./components/AddQuotation";
 
 function App() {
    return (
@@ -89,6 +91,9 @@ function App() {
             <Route path="/purchase-returns/add" element={<AddPurchaseReturn />} />
             <Route path="/purchase-returns/view/:id" element={<ViewPurchaseReturn />} />
             <Route path="/purchase-returns/edit/:id" element={<EditPurchaseReturn />} />
+
+            <Route path="/quotations" element={<Quotations />} />
+            <Route path="/quotations/add" element={<AddQuotation />} />
         </Routes>
       </div>
     </div></BrowserRouter>
