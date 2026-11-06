@@ -40,6 +40,7 @@ import ViewPurchaseReturn from "./components/ViewPurchaseReturn";
 import Quotations from "./components/Quotations";
 import AddQuotation from "./components/AddQuotation";
 import ViewQuotation from "./components/ViewQuotation";
+import EditQuotation from "./components/EditQuotation";
 
 function App() {
    return (
@@ -96,6 +97,7 @@ function App() {
             <Route path="/quotations" element={<Quotations />} />
             <Route path="/quotations/add" element={<AddQuotation />} />
             <Route path="/quotations/view/:id" element={<ViewQuotation />} />
+            <Route path="/quotations/edit/:id" element={<EditQuotation />} />
         </Routes>
       </div>
     </div></BrowserRouter>

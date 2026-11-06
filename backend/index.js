@@ -798,8 +798,14 @@ app.put("/quotations/:id", async (req, res) => {
     quotation.taxAmount = Number(taxAmount) || 0;
     quotation.discount = Number(discount) || 0;
     quotation.grandTotal = Number(grandTotal) || 0;
-    quotation.status = status || quotation.status;
-    quotation.notes = notes || "";
+    // quotation.status = status || quotation.status;
+if (status === "Converted") {
+  return res.status(400).json({
+    message: "A quotation can only be marked Converted through invoice conversion.",
+  });
+}
+
+quotation.status = status || quotation.status;
 
     const updatedQuotation = await quotation.save();
 
