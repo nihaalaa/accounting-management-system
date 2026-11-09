@@ -16,10 +16,17 @@ export const AuthProvider = ({ children }) => {
     localStorage.getItem("shopledger_token")
   );
 
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("shopledger_user");
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+const [user, setUser] = useState(() => {
+  const savedUser = localStorage.getItem("shopledger_user");
+
+  try {
+    return savedUser && savedUser !== "undefined"
+      ? JSON.parse(savedUser)
+      : null;
+  } catch (error) {
+    return null;
+  }
+});
 
   const [role, setRole] = useState(
     localStorage.getItem("shopledger_role")

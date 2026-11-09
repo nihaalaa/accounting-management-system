@@ -46,7 +46,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Login } from "./components/Login";
 import { Register } from "./components/Register";
 import { Navigate } from "react-router-dom";
-
+import { ManageBusinesses } from "./components/ManageBusinesses";
+import { BusinessDetails } from "./components/BusinessDetails";
 
 function AppRoutes() {
   const { role, token, loading } = useAuth();
@@ -100,8 +101,12 @@ function AppRoutes() {
           <Route element={<ProtectedRoute allowedRole="admin" />}>
             <Route
               path="/admin/businesses"
-              element={<div>Manage Businesses page coming next.</div>}
+              element={<ManageBusinesses />}
             />
+            <Route
+  path="/admin/businesses/:id"
+  element={<BusinessDetails />}
+/>
           </Route>
 
           {/* Business-only accounting routes */}
