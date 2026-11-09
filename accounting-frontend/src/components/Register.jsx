@@ -53,7 +53,9 @@ export const Register = () => {
       setSuccess(
         "Registration successful! Your account is pending Super Admin approval."
       );
-
+setTimeout(() => {
+  navigate("/login");
+}, 2000);
       setFormData({
         businessName: "",
         ownerName: "",

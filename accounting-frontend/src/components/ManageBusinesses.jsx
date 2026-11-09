@@ -7,6 +7,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 export const ManageBusinesses = () => {
   const { token } = useAuth();
+    const navigate = useNavigate();
 
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +16,6 @@ export const ManageBusinesses = () => {
   const [updatingId, setUpdatingId] = useState(null);
 
   const fetchBusinesses = async () => {
-    const navigate = useNavigate();
     try {
       setLoading(true);
       setError("");
