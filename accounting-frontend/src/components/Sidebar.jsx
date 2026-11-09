@@ -44,10 +44,11 @@ export const Sidebar = () => {
       icon: <BsBuilding />,
     },
   ];
-
-  const menuItems =
-    role === "admin" ? adminMenuItems : businessMenuItems;
-
+const menuItems =
+  role === "admin"
+    ? [...businessMenuItems, ...adminMenuItems]
+    : businessMenuItems;
+    
   const displayName =
     role === "admin"
       ? user?.username || "Super Admin"

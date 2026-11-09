@@ -105,8 +105,8 @@ function AppRoutes() {
           </Route>
 
           {/* Business-only accounting routes */}
-          <Route element={<ProtectedRoute allowedRole="business" />}>
-            <Route path="/" element={<Dashboard />} />
+<Route element={<ProtectedRoute />}>        
+    <Route path="/" element={<Dashboard />} />
 
             <Route path="/categories" element={<Categories />} />
             <Route path="/categories/add" element={<AddCategory />} />
