@@ -9,12 +9,100 @@ const path = require("path");
 const hsnData = require("./data/hsn-directory.json");
 const gstRateData = require("./data/gst-rate-directory.json");
 
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+
 require("dotenv").config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// ===============================
+// ADMIN AUTHENTICATION MIDDLEWARE
+// ===============================
+
+const verifyAdmin = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        message: "Authentication token is required",
+      });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (decoded.role !== "admin") {
+      return res.status(403).json({
+        message: "Admin access only",
+      });
+    }
+
+    req.admin = decoded;
+
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      message: "Invalid or expired token",
+    });
+  }
+};
+
+// ===============================
+// BUSINESS AUTHENTICATION MIDDLEWARE
+// ===============================
+
+const verifyBusiness = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        message: "Authentication token is required",
+      });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (decoded.role !== "business" || !decoded.id) {
+      return res.status(403).json({
+        message: "Business access only",
+      });
+    }
+
+    // Check current account status in MongoDB
+    const business = await Business.findById(decoded.id);
+
+    if (!business) {
+      return res.status(401).json({
+        message: "Business account not found",
+      });
+    }
+
+    if (business.status !== "Approved") {
+      return res.status(403).json({
+        message: "Your business account is not approved or is no longer active",
+      });
+    }
+
+    req.business = business;
+
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      message: "Invalid or expired token",
+    });
+  }
+};
+
+
 const Category = require("./models/Category");
 const Product = require("./models/Product");
 const Expense = require("./models/Expense");
@@ -26,6 +114,7 @@ const Supplier = require("./models/Supplier");
 const Purchase = require("./models/Purchase");
 const SalesReturn = require("./models/SalesReturn");
 const PurchaseReturn = require("./models/PurchaseReturn");
+const Business = require("./models/Business");
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("mongodb connected"))
@@ -4037,7 +4126,414 @@ app.delete("/purchase-returns/:id", async (req, res) => {
   }
 });
 
+// ===============================
+// ADMIN LOGIN
+// ===============================
 
+app.post("/admin/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        message: "Username and password are required",
+      });
+    }
+
+    if (
+      !process.env.ADMIN_USERNAME ||
+      !process.env.ADMIN_PASSWORD_HASH ||
+      !process.env.JWT_SECRET
+    ) {
+      console.error("Admin authentication environment variables are missing");
+
+      return res.status(500).json({
+        message: "Admin authentication is not configured",
+      });
+    }
+
+    // Check username
+    if (username !== process.env.ADMIN_USERNAME) {
+      return res.status(401).json({
+        message: "Invalid username or password",
+      });
+    }
+
+    // Compare entered password with stored hash
+    const isPasswordCorrect = await bcrypt.compare(
+      password,
+      process.env.ADMIN_PASSWORD_HASH
+    );
+
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        message: "Invalid username or password",
+      });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      {
+        role: "admin",
+        username: process.env.ADMIN_USERNAME,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "8h",
+      }
+    );
+
+    res.status(200).json({
+      message: "Admin login successful",
+      token,
+      user: {
+        username: process.env.ADMIN_USERNAME,
+        role: "admin",
+      },
+    });
+  } catch (error) {
+    console.error("Admin login error:", error);
+
+    res.status(500).json({
+      message: "Server error during admin login",
+    });
+  }
+});
+
+// ===============================
+// VERIFY ADMIN LOGIN
+// ===============================
+
+app.get("/admin/me", verifyAdmin, (req, res) => {
+  res.status(200).json({
+    message: "Admin authenticated successfully",
+    user: {
+      username: req.admin.username,
+      role: req.admin.role,
+    },
+  });
+});
+
+
+const allowedBusinessStatusChanges = {
+  Pending: ["Approved", "Rejected"],
+  Approved: ["Blocked", "Rejected"],
+  Blocked: ["Approved"],
+  Rejected: ["Approved"],
+};
+
+// GET: List and search registered businesses
+app.get("/admin/businesses", verifyAdmin, async (req, res) => {
+  try {
+    const search = String(req.query.search || "").trim();
+
+    let filter = {};
+
+    if (search) {
+      const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+      filter = {
+        $or: [
+          { businessName: { $regex: safeSearch, $options: "i" } },
+          { ownerName: { $regex: safeSearch, $options: "i" } },
+          { email: { $regex: safeSearch, $options: "i" } },
+          { phone: { $regex: safeSearch, $options: "i" } },
+        ],
+      };
+    }
+
+    const businesses = await Business.find(filter)
+      .select("-passwordHash")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      businesses,
+    });
+  } catch (error) {
+    console.error("Get businesses error:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch businesses",
+    });
+  }
+});
+
+// GET: View one business's details
+app.get("/admin/businesses/:id", verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid business ID",
+      });
+    }
+
+    const business = await Business.findById(id).select("-passwordHash");
+
+    if (!business) {
+      return res.status(404).json({
+        message: "Business not found",
+      });
+    }
+
+    res.status(200).json({
+      business,
+    });
+  } catch (error) {
+    console.error("Get business details error:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch business details",
+    });
+  }
+});
+
+// PATCH: Approve, reject, block or unblock a business
+app.patch("/admin/businesses/:id/status", verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid business ID",
+      });
+    }
+
+    const business = await Business.findById(id);
+
+    if (!business) {
+      return res.status(404).json({
+        message: "Business not found",
+      });
+    }
+
+    const allowedChanges = allowedBusinessStatusChanges[business.status] || [];
+
+    if (!allowedChanges.includes(status)) {
+      return res.status(400).json({
+        message: `Cannot change business status from ${business.status} to ${status}`,
+      });
+    }
+
+    business.status = status;
+    await business.save();
+
+    const updatedBusiness = await Business.findById(id).select("-passwordHash");
+
+    res.status(200).json({
+      message: `Business status updated to ${status}`,
+      business: updatedBusiness,
+    });
+  } catch (error) {
+    console.error("Update business status error:", error);
+
+    res.status(500).json({
+      message: "Failed to update business status",
+    });
+  }
+});
+
+// ===============================
+// BUSINESS REGISTRATION
+// ===============================
+
+app.post("/business/register", async (req, res) => {
+  try {
+    const {
+      businessName,
+      ownerName,
+      email,
+      phone,
+      password,
+    } = req.body;
+
+    // Validate required fields
+    if (
+      !businessName?.trim() ||
+      !ownerName?.trim() ||
+      !email?.trim() ||
+      !phone?.trim() ||
+      !password
+    ) {
+      return res.status(400).json({
+        message: "Please fill in all required fields",
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        message: "Password must contain at least 8 characters",
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check whether email already exists
+    const existingBusiness = await Business.findOne({
+      email: normalizedEmail,
+    });
+
+    if (existingBusiness) {
+      return res.status(409).json({
+        message: "An account with this email already exists",
+      });
+    }
+
+    // Hash business password
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    // Create business account
+    const business = new Business({
+      businessName: businessName.trim(),
+      ownerName: ownerName.trim(),
+      email: normalizedEmail,
+      phone: phone.trim(),
+      passwordHash,
+      status: "Pending",
+    });
+
+    await business.save();
+
+    res.status(201).json({
+      message: "Registration successful. Your account is waiting for admin approval.",
+      business: {
+        id: business._id,
+        businessName: business.businessName,
+        ownerName: business.ownerName,
+        email: business.email,
+        phone: business.phone,
+        status: business.status,
+      },
+    });
+  } catch (error) {
+    console.error("Business registration error:", error);
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "An account with this email already exists",
+      });
+    }
+
+    res.status(500).json({
+      message: "Failed to register business",
+    });
+  }
+});
+// ===============================
+// BUSINESS LOGIN
+// ===============================
+
+app.post("/business/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Find business and include passwordHash
+    const business = await Business.findOne({
+      email: normalizedEmail,
+    }).select("+passwordHash");
+
+    if (!business) {
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    // Verify password
+    const isPasswordCorrect = await bcrypt.compare(
+      password,
+      business.passwordHash
+    );
+
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    // Check business approval status
+    if (business.status === "Pending") {
+      return res.status(403).json({
+        message: "Your registration is awaiting admin approval.",
+        status: business.status,
+      });
+    }
+
+    if (business.status === "Rejected") {
+      return res.status(403).json({
+        message: "Your registration has been rejected. Please contact support.",
+        status: business.status,
+      });
+    }
+
+    if (business.status === "Blocked") {
+      return res.status(403).json({
+        message: "Your account has been blocked. Please contact support.",
+        status: business.status,
+      });
+    }
+
+    // Generate business JWT
+    const token = jwt.sign(
+      {
+        id: business._id,
+        role: "business",
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "8h",
+      }
+    );
+
+    res.status(200).json({
+      message: "Business login successful",
+      token,
+      user: {
+        id: business._id,
+        businessName: business.businessName,
+        ownerName: business.ownerName,
+        email: business.email,
+        phone: business.phone,
+        role: "business",
+        status: business.status,
+      },
+    });
+  } catch (error) {
+    console.error("Business login error:", error);
+
+    res.status(500).json({
+      message: "Server error during business login",
+    });
+  }
+});
+
+// ===============================
+// VERIFY BUSINESS LOGIN
+// ===============================
+
+app.get("/business/me", verifyBusiness, (req, res) => {
+  res.status(200).json({
+    message: "Business authenticated successfully",
+    user: {
+      id: req.business._id,
+      businessName: req.business.businessName,
+      ownerName: req.business.ownerName,
+      email: req.business.email,
+      phone: req.business.phone,
+      role: "business",
+      status: req.business.status,
+    },
+  });
+});
 
 const PORT = process.env.PORT || 5000;
 

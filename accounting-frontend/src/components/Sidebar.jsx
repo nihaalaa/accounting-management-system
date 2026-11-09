@@ -1,28 +1,32 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+
 import {
   BsGrid,
   BsTags,
   BsBoxSeam,
-  BsCartCheck,
   BsBagCheck,
   BsPeople,
   BsTruck,
   BsCashStack,
-  BsBarChart,
   BsGear,
   BsBoxArrowRight,
   BsReceipt,
-    BsArrowReturnLeft,
-    BsFileEarmarkText,
+  BsArrowReturnLeft,
+  BsFileEarmarkText,
+  BsBuilding,
 } from "react-icons/bs";
 
+
 export const Sidebar = () => {
-  const menuItems = [
+  const { user, role, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const businessMenuItems = [
     { name: "Dashboard", path: "/", icon: <BsGrid /> },
     { name: "Products", path: "/products", icon: <BsBoxSeam /> },
     { name: "Categories", path: "/categories", icon: <BsTags /> },
-    // { name: "Sales", path: "/sales", icon: <BsCartCheck /> },
     { name: "Customers", path: "/customers", icon: <BsPeople /> },
     { name: "Sales", path: "/invoices", icon: <BsReceipt /> },
     { name: "Quotations", path: "/quotations", icon: <BsFileEarmarkText /> },
@@ -31,12 +35,38 @@ export const Sidebar = () => {
     { name: "Purchases", path: "/purchases", icon: <BsBagCheck /> },
     { name: "Purchase Returns", path: "/purchase-returns", icon: <BsArrowReturnLeft /> },
     { name: "Suppliers", path: "/suppliers", icon: <BsTruck /> },
-    // { name: "Reports", path: "/reports", icon: <BsBarChart /> },
   ];
+
+  const adminMenuItems = [
+    {
+      name: "Manage Businesses",
+      path: "/admin/businesses",
+      icon: <BsBuilding />,
+    },
+  ];
+
+  const menuItems =
+    role === "admin" ? adminMenuItems : businessMenuItems;
+
+  const displayName =
+    role === "admin"
+      ? user?.username || "Super Admin"
+      : user?.businessName || "Business";
+
+  const displayRole =
+    role === "admin"
+      ? "Super Admin"
+      : user?.ownerName || "Business Account";
+
+  const avatarLetter = displayName.charAt(0).toUpperCase();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <aside style={sidebarStyle}>
-      {/* Hover styles */}
       <style>{`
         .sb-link:not(.active):hover {
           background-color: rgba(255, 255, 255, 0.06) !important;
@@ -65,14 +95,9 @@ export const Sidebar = () => {
 
       {/* Brand */}
       <div style={brandStyle}>
-        {/* <div style={logoStyle}>S</div> */}
-
         <div>
           <div style={brandName}>ShopLedger</div>
-
-          <div style={brandSubtitle}>
-            Business Management
-          </div>
+          <div style={brandSubtitle}>Business Management</div>
         </div>
       </div>
 
@@ -90,10 +115,7 @@ export const Sidebar = () => {
                 ...(isActive ? activeLinkStyle : {}),
               })}
             >
-              <span style={iconStyle}>
-                {item.icon}
-              </span>
-
+              <span style={iconStyle}>{item.icon}</span>
               <span>{item.name}</span>
             </NavLink>
           ))}
@@ -102,47 +124,44 @@ export const Sidebar = () => {
 
       {/* Bottom */}
       <div style={bottomSection}>
-        <NavLink
-          to="/settings"
-          className="sb-settings"
-          style={({ isActive }) => ({
-            ...linkStyle,
-            ...(isActive ? activeLinkStyle : {}),
-          })}
-        >
-          <span style={iconStyle}>
-            <BsGear />
-          </span>
-
-          <span>Settings</span>
-        </NavLink>
+        {role === "business" && (
+          <NavLink
+            to="/settings"
+            className="sb-settings"
+            style={({ isActive }) => ({
+              ...linkStyle,
+              ...(isActive ? activeLinkStyle : {}),
+            })}
+          >
+            <span style={iconStyle}>
+              <BsGear />
+            </span>
+            <span>Settings</span>
+          </NavLink>
+        )}
 
         {/* Profile */}
         <div style={profileStyle}>
-          <div style={avatarStyle}>A</div>
+          <div style={avatarStyle}>{avatarLetter}</div>
 
-          <div
-            style={{
-              flex: 1,
-              minWidth: 0,
-            }}
-          >
-            <div style={profileName}>
-              Admin
-            </div>
-
-            <div style={profileRole}>
-              Administrator
-            </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={profileName}>{displayName}</div>
+            <div style={profileRole}>{displayRole}</div>
           </div>
 
-          <span
+          <button
+            type="button"
             className="sb-logout"
             title="Logout"
-            style={logoutStyle}
+            onClick={handleLogout}
+            style={{
+              ...logoutStyle,
+              background: "transparent",
+              border: "none",
+            }}
           >
             <BsBoxArrowRight size={16} />
-          </span>
+          </button>
         </div>
       </div>
     </aside>

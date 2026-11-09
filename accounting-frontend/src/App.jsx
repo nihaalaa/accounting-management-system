@@ -1,6 +1,5 @@
 import React from "react";
 import { Sidebar } from "./components/Sidebar";
-import { useState } from "react";
 import { Categories } from "./components/Categories";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AddCategory } from "./components/AddCategory";
@@ -42,51 +41,109 @@ import AddQuotation from "./components/AddQuotation";
 import ViewQuotation from "./components/ViewQuotation";
 import EditQuotation from "./components/EditQuotation";
 
-function App() {
-   return (
-    <BrowserRouter>
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { Login } from "./components/Login";
+import { Register } from "./components/Register";
+import { Navigate } from "react-router-dom";
+
+
+function AppRoutes() {
+  const { role, token, loading } = useAuth();
+
+  if (loading) {
+    return <div style={{ padding: "40px" }}>Loading ShopLedger...</div>;
+  }
+
+  return (
     <div style={{ display: "flex" }}>
-      <Sidebar />
+      {token && <Sidebar />}
 
-      <div  style={{ flex: 1, minWidth: 0 ,marginLeft:"250px"}}>
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          marginLeft: token ? "250px" : "0",
+        }}
+      >
         <Routes>
-            <Route path='/' element={<Dashboard />}/>
-            <Route path='/categories' element={<Categories />}/>     
-            <Route path='/categories/add' element={<AddCategory />}/>
-            <Route path='/categories/edit/:id' element={<EditCategory />}/>
-            <Route path="/categories/view/:id" element={<ViewCategory />}/>
+          {/* Public routes */}
+          <Route
+            path="/login"
+            element={
+              token ? (
+                <Navigate
+                  to={role === "admin" ? "/admin/businesses" : "/"}
+                  replace
+                />
+              ) : (
+                <Login />
+              )
+            }
+          />
 
-            <Route path='/products' element={<Products />} />
-            <Route path='/products/add' element={<AddProduct />}/>
-            <Route path="/products/view/:id" element={<ViewProduct />}/>
-            <Route path='/products/edit/:id' element={<EditProduct />}/>
+          <Route
+            path="/register"
+            element={
+              token ? (
+                <Navigate
+                  to={role === "admin" ? "/admin/businesses" : "/"}
+                  replace
+                />
+              ) : (
+                <Register />
+              )
+            }
+          />
 
-            <Route path='/customers' element={<Customers />} />
-            <Route path='/customers/add' element={<AddCustomers />}/>
-            <Route path='/customers/edit/:id' element={<EditCustomers />}/>
-            <Route path='/customers/view/:id' element={<ViewCustomer />} />
+          {/* Admin-only routes */}
+          <Route element={<ProtectedRoute allowedRole="admin" />}>
+            <Route
+              path="/admin/businesses"
+              element={<div>Manage Businesses page coming next.</div>}
+            />
+          </Route>
 
-            <Route path='/suppliers' element={<Suppliers />} />
+          {/* Business-only accounting routes */}
+          <Route element={<ProtectedRoute allowedRole="business" />}>
+            <Route path="/" element={<Dashboard />} />
+
+            <Route path="/categories" element={<Categories />} />
+            <Route path="/categories/add" element={<AddCategory />} />
+            <Route path="/categories/edit/:id" element={<EditCategory />} />
+            <Route path="/categories/view/:id" element={<ViewCategory />} />
+
+            <Route path="/products" element={<Products />} />
+            <Route path="/products/add" element={<AddProduct />} />
+            <Route path="/products/view/:id" element={<ViewProduct />} />
+            <Route path="/products/edit/:id" element={<EditProduct />} />
+
+            <Route path="/customers" element={<Customers />} />
+            <Route path="/customers/add" element={<AddCustomers />} />
+            <Route path="/customers/edit/:id" element={<EditCustomers />} />
+            <Route path="/customers/view/:id" element={<ViewCustomer />} />
+
+            <Route path="/suppliers" element={<Suppliers />} />
             <Route path="/suppliers/add" element={<AddSupplier />} />
 
-            <Route path='/expenses' element={<Expenses />} />
-            <Route path='/expenses/add' element={<AddExpense />} />
-            <Route path='/expenses/edit/:id' element={<EditExpense />}/>
-            <Route path='/expenses/view/:id' element={<ViewExpense />}/>
+            <Route path="/expenses" element={<Expenses />} />
+            <Route path="/expenses/add" element={<AddExpense />} />
+            <Route path="/expenses/edit/:id" element={<EditExpense />} />
+            <Route path="/expenses/view/:id" element={<ViewExpense />} />
 
-            <Route path='/invoices' element={<Invoices />} />
-            <Route path='/invoices/add' element={<AddInvoice />} />
-            <Route path='/invoices/view/:id' element={<ViewInvoice />} />
-            <Route path='/invoices/edit/:id' element={<EditInvoice />} />
+            <Route path="/invoices" element={<Invoices />} />
+            <Route path="/invoices/add" element={<AddInvoice />} />
+            <Route path="/invoices/view/:id" element={<ViewInvoice />} />
+            <Route path="/invoices/edit/:id" element={<EditInvoice />} />
 
-            <Route path='/purchases' element={<Purchases />}/>
-            <Route path='/purchases/add' element={<AddPurchase />} />
-            <Route path= '/purchases/view/:id' element={<ViewPurchase />} />
-            <Route path='/purchases/edit/:id' element={<EditPurchase />} />
+            <Route path="/purchases" element={<Purchases />} />
+            <Route path="/purchases/add" element={<AddPurchase />} />
+            <Route path="/purchases/view/:id" element={<ViewPurchase />} />
+            <Route path="/purchases/edit/:id" element={<EditPurchase />} />
 
-            <Route path='/sales-returns' element={<SalesReturns />} />
-            <Route path='/sales-returns/add' element={<AddSalesReturn />} />
-            <Route path='/sales-returns/view/:id' element={<ViewSalesReturn />} />
+            <Route path="/sales-returns" element={<SalesReturns />} />
+            <Route path="/sales-returns/add" element={<AddSalesReturn />} />
+            <Route path="/sales-returns/view/:id" element={<ViewSalesReturn />} />
             <Route path="/sales-returns/edit/:id" element={<EditSalesReturn />} />
 
             <Route path="/purchase-returns" element={<PurchaseReturns />} />
@@ -98,9 +155,37 @@ function App() {
             <Route path="/quotations/add" element={<AddQuotation />} />
             <Route path="/quotations/view/:id" element={<ViewQuotation />} />
             <Route path="/quotations/edit/:id" element={<EditQuotation />} />
+          </Route>
+
+          {/* Unknown routes */}
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to={
+                  !token
+                    ? "/login"
+                    : role === "admin"
+                      ? "/admin/businesses"
+                      : "/"
+                }
+                replace
+              />
+            }
+          />
         </Routes>
       </div>
-    </div></BrowserRouter>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
